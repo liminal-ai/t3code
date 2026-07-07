@@ -13,6 +13,7 @@
     "test": "vp test run"
   },
   "dependencies": {
+    "@t3tools/contracts": "workspace:*",
     "lhc": "link:../../../../pi-long-horizon/liminal-context/packages/lhc"
   },
   "devDependencies": {

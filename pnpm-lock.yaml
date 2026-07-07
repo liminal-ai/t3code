@@ -815,6 +815,9 @@ importers:
 
   packages/lhc-host:
     dependencies:
+      '@t3tools/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       lhc:
         specifier: link:../../../../pi-long-horizon/liminal-context/packages/lhc
         version: link:../../../../pi-long-horizon/liminal-context/packages/lhc

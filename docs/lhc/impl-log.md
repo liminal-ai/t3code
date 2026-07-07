@@ -114,3 +114,21 @@ launch/completion time. Newest entries at the bottom. Format:
   by turnId, so Codex's stream user_message items dedupe against them via LHC idempotency
   (key wins over content).
 - next: Slice 1.1 (mapper + turn accumulator, GPT-5.5 high).
+
+## 2026-07-07 — Slice 1.1: mapper + turn accumulator done
+
+- status: done
+- who: GPT-5.5 high (run -db502f, 8.1m; revision -ba9e88, 3.2m), verified Fable high
+  (run -f9a4e0: ACCEPT with 5 findings, all addressed → converged)
+- what: `packages/lhc-host/src/intake/` — tolerant mapper (ProviderRuntimeEvent → LHC
+  intake events), pure-observer turn accumulator, capture stats. Dedupe linchpin verified:
+  stream-derived and host-injected user_prompts share one key builder
+  (`t3lhc:<threadId>:turn:<turnId>:user_prompt`); replay-twice through the real SDK proves
+  zero dupes ({open:1,closed:3} Codex / {open:1,closed:2} Claude). Tool outputs verified
+  full (Claude fullOutput, Codex aggregatedOutput) with metadata-only marker fallback.
+  Revision: TOOL_LIFECYCLE_ITEM_TYPES now imported from @t3tools/contracts (runtime-value
+  drift = silent capture loss); context_compaction + user_message_no_turn coverage added;
+  known limits documented in-code (same-turnId content drop by key-wins design;
+  eventId-key stability bounded to re-tails of the persisted stream).
+- next: Slice 1.2 — capture service + lineage + server bootstrap wiring (Fable codes,
+  GPT-5.5 verifies). 1.2a (inference lane) already landed.

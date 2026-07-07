@@ -1,0 +1,103 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`provider runtime to LHC intake mapper > replays the Claude post-patch fixture and uses host-injected user prompts 1`] = `
+[
+  {
+    "key": "t3lhc:event-fidelity-claude-1783436515221:turn:5ef8f3ed-8b34-4ee9-8c86-a6fca14bae66:user_prompt",
+    "kind": "user_prompt",
+  },
+  {
+    "key": "t3lhc:event-fidelity-claude-1783436515221:c4b28839-0bed-4d6c-9590-fc6259bc314d:assistant_thinking",
+    "kind": "assistant_thinking",
+  },
+  {
+    "key": "t3lhc:event-fidelity-claude-1783436515221:toolu_01QmPF23SndGffUfLsakDUNg:tool_call",
+    "kind": "tool_call",
+    "toolCallId": "toolu_01QmPF23SndGffUfLsakDUNg",
+  },
+  {
+    "key": "t3lhc:event-fidelity-claude-1783436515221:toolu_01QmPF23SndGffUfLsakDUNg:tool_result",
+    "kind": "tool_result",
+    "toolCallId": "toolu_01QmPF23SndGffUfLsakDUNg",
+  },
+  {
+    "key": "t3lhc:event-fidelity-claude-1783436515221:969ea49a-42c6-4b91-a726-8e4196440690:assistant_text",
+    "kind": "assistant_text",
+  },
+  {
+    "key": "t3lhc:event-fidelity-claude-1783436515221:e7eae1f8-fae8-4675-a90b-5ff9bbbc0128:turn_end",
+    "kind": "turn_end",
+  },
+  {
+    "key": "t3lhc:event-fidelity-claude-1783436515221:turn:5f3401da-fddf-49a2-a02a-c69cc8cc99df:user_prompt",
+    "kind": "user_prompt",
+  },
+  {
+    "key": "t3lhc:event-fidelity-claude-1783436515221:5c7c8d13-bad9-44fa-9655-1f13e552908e:assistant_thinking",
+    "kind": "assistant_thinking",
+  },
+  {
+    "key": "t3lhc:event-fidelity-claude-1783436515221:b2cbb47d-72bd-4f75-a856-cdb2d3b68f4f:assistant_text",
+    "kind": "assistant_text",
+  },
+  {
+    "key": "t3lhc:event-fidelity-claude-1783436515221:4a05cf87-c61e-4f9d-98b8-dbd980b534ca:turn_end",
+    "kind": "turn_end",
+  },
+]
+`;
+
+exports[`provider runtime to LHC intake mapper > replays the Codex fidelity fixture with stream-derived user prompts 1`] = `
+[
+  {
+    "key": "t3lhc:event-fidelity-codex-1783432797033:turn:019f3ce0-dc61-7253-922d-32cba6f70364:user_prompt",
+    "kind": "user_prompt",
+  },
+  {
+    "key": "t3lhc:event-fidelity-codex-1783432797033:call_0qrA4ZbtILjCgJFLBNH4QDEa:tool_call",
+    "kind": "tool_call",
+    "toolCallId": "call_0qrA4ZbtILjCgJFLBNH4QDEa",
+  },
+  {
+    "key": "t3lhc:event-fidelity-codex-1783432797033:call_0qrA4ZbtILjCgJFLBNH4QDEa:tool_result",
+    "kind": "tool_result",
+    "toolCallId": "call_0qrA4ZbtILjCgJFLBNH4QDEa",
+  },
+  {
+    "key": "t3lhc:event-fidelity-codex-1783432797033:msg_049ee6b6f80cc798016a4d06621b70819790098923aaae9495:assistant_text",
+    "kind": "assistant_text",
+  },
+  {
+    "key": "t3lhc:event-fidelity-codex-1783432797033:cd6eca81-1759-46dd-ad58-f73981cd806f:turn_end",
+    "kind": "turn_end",
+  },
+  {
+    "key": "t3lhc:event-fidelity-codex-1783432797033:turn:019f3ce0-f0f9-7d83-99f1-fb53d5139055:user_prompt",
+    "kind": "user_prompt",
+  },
+  {
+    "key": "t3lhc:event-fidelity-codex-1783432797033:msg_049ee6b6f80cc798016a4d0668e7148197aec0ad3b717282cc:assistant_text",
+    "kind": "assistant_text",
+  },
+  {
+    "key": "t3lhc:event-fidelity-codex-1783432797033:e1f6e361-9b88-48de-a3c0-68c2e8dfa520:turn_end",
+    "kind": "turn_end",
+  },
+  {
+    "key": "t3lhc:event-fidelity-codex-1783432797033:turn:019f3ce1-0c6d-7812-b929-09c5dbad7ae4:user_prompt",
+    "kind": "user_prompt",
+  },
+  {
+    "key": "t3lhc:event-fidelity-codex-1783432797033:msg_049ee6b6f80cc798016a4d066abe588197b897b955f4aabc6e:assistant_text",
+    "kind": "assistant_text",
+  },
+  {
+    "key": "t3lhc:event-fidelity-codex-1783432797033:e6af9fac-0451-4cde-87cf-4c09f8972cd0:runtime_note",
+    "kind": "runtime_note",
+  },
+  {
+    "key": "t3lhc:event-fidelity-codex-1783432797033:e6af9fac-0451-4cde-87cf-4c09f8972cd0:turn_end",
+    "kind": "turn_end",
+  },
+]
+`;
