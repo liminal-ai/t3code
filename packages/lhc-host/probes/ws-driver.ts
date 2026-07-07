@@ -301,12 +301,14 @@ export const createProjectAndThread = (
     provider: ProviderName;
     title?: string;
     reasoning?: boolean;
+    modelSelection?: ModelSelectionLite;
   },
 ): Effect.Effect<CreatedThread, unknown> =>
   Effect.gen(function* () {
     const projectId = uuid();
     const threadId = uuid();
-    const modelSelection = modelSelectionFor(opts.provider, { reasoning: opts.reasoning });
+    const modelSelection =
+      opts.modelSelection ?? modelSelectionFor(opts.provider, { reasoning: opts.reasoning });
     const title = opts.title ?? `lhc-1.3 ${opts.provider}`;
 
     yield* dispatch(handle, {
@@ -359,11 +361,13 @@ export const runTurn = (
     reasoning?: boolean;
     interruptAfterMs?: number;
     timeoutMs?: number;
+    modelSelection?: ModelSelectionLite;
   },
 ): Effect.Effect<TurnResult, unknown> =>
   Effect.gen(function* () {
     const timeoutMs = opts.timeoutMs ?? 240_000;
-    const modelSelection = modelSelectionFor(opts.provider, { reasoning: opts.reasoning });
+    const modelSelection =
+      opts.modelSelection ?? modelSelectionFor(opts.provider, { reasoning: opts.reasoning });
 
     yield* dispatch(handle, {
       type: "thread.turn.start",

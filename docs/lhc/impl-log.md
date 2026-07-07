@@ -295,3 +295,22 @@ launch/completion time. Newest entries at the bottom. Format:
   second-swap cwd resolution when no active session (runtimePayload overwrite drops
   cwd — pre-existing, shared with Claude); authOverlay CODEX_HOME sessions placement.
 - next: Slice 4.3 — codex live acceptance (mirror of 2.4, plus the 4.2 risk list).
+
+## 2026-07-07 — Slice 4.3: codex live acceptance — PHASE 4 COMPLETE
+
+- status: done (9 PASS + 1 N/A, 0 FAIL)
+- who: Fable high (run -ba789e, 15.0m), orchestrator-accepted. Cost ~$3-6
+  (gpt-5.4-mini, reasoningEffort low, worked fine for acceptance turns).
+- what: docs/lhc/findings/phase4-acceptance.md. Codex loop proven live end-to-end:
+  grow → compact (200, dated path, filename==meta id, bare {threadId} cursor) → resume
+  rebuilt id with exact recall (usedTokens 27,506→14,520) → continuity → QUIESCED SECOND
+  SWAP (4.2 risk: PASSED — cwd survives via upsert shallow-merge; latent dependency
+  noted) → prune → 404/409 → MIXED-PROVIDER dispatch (claude compact routed correctly =
+  live refactor no-regression proof) → clean sweep (54/54 derivations, full 468,938-byte
+  fidelity). authOverlay N/A on this box (direct mode). Provider divergence recorded:
+  codex usedTokens accumulates; Claude's plateaus via tool-output eviction.
+- phase-5 punch list (from findings): (1) latent cwd dependency on upsert merge
+  semantics — either persist cwd in the flip or add a regression test pinning the merge;
+  (2) date-scoped rollout discovery (unbounded DFS over ~/.codex/sessions today);
+  (3) backfill server-level route dispatch integration test if cheap.
+- next: Phase 5 — Linux box deployment + dogfood + version-hop rehearsal (needs Lee).
