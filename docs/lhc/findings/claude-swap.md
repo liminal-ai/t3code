@@ -48,8 +48,8 @@ Probe: `packages/lhc-host/probes/claude-swap-probe.ts` (phases `baseline` → `r
    - user `message`: `{ role: "user", content: "<text>" }` (plain string content works,
      even though the live CLI writes content-block arrays)
    - assistant `message`: `{ role: "assistant", id: "msg_<uuid-no-dashes>", type:
-  "message", model: "<model>", stop_reason: "end_turn", content: [{ type: "text",
-  text }] }`
+"message", model: "<model>", stop_reason: "end_turn", content: [{ type: "text",
+text }] }`
      Not required: `requestId`, `promptId`, `promptSource`, `permissionMode`, `usage`,
      `diagnostics`, `queue-operation`/`attachment`/`last-prompt`/`ai-title` metadata lines,
      thinking blocks. Wholly synthetic exchanges (never sent to the provider) are honored —
