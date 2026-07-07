@@ -1,0 +1,175 @@
+{
+  "provider": "claude",
+  "driver": "claudeAgent",
+  "threadId": "event-fidelity-claude-1783436515221",
+  "cwd": "/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-event-fidelity-claude-hbqxxX",
+  "modelSelection": {
+    "instanceId": "claudeAgent",
+    "model": "claude-haiku-4-5",
+    "options": [
+      {
+        "id": "thinking",
+        "value": true
+      }
+    ]
+  },
+  "session": {
+    "threadId": "event-fidelity-claude-1783436515221",
+    "provider": "claudeAgent",
+    "providerInstanceId": "claudeAgent",
+    "status": "ready",
+    "runtimeMode": "full-access",
+    "cwd": "/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-event-fidelity-claude-hbqxxX",
+    "model": "claude-haiku-4-5",
+    "resumeCursor": {
+      "threadId": "event-fidelity-claude-1783436515221",
+      "resume": "9197e9e7-e292-4ab8-8f39-be178c937647",
+      "turnCount": 0
+    },
+    "createdAt": "2026-07-07T15:01:55.223Z",
+    "updatedAt": "2026-07-07T15:01:55.223Z"
+  },
+  "normalizedPath": "packages/lhc-host/test/fixtures/event-fidelity/claude/post-patch/claude-normalized.full.jsonl",
+  "nativeLogPath": "packages/lhc-host/test/fixtures/event-fidelity/claude/post-patch/claude-native.log",
+  "turns": [
+    {
+      "label": "large-tool-output",
+      "prompt": "Run `seq 1 20000` in this git repo, then answer with exactly `last number: 20000` and no extra prose.",
+      "turnId": "5ef8f3ed-8b34-4ee9-8c86-a6fca14bae66",
+      "completion": {
+        "status": "turn.completed",
+        "event": {
+          "type": "turn.completed",
+          "eventId": "e7eae1f8-fae8-4675-a90b-5ff9bbbc0128",
+          "provider": "claudeAgent",
+          "createdAt": "2026-07-07T15:02:02.284Z",
+          "threadId": "event-fidelity-claude-1783436515221",
+          "turnId": "5ef8f3ed-8b34-4ee9-8c86-a6fca14bae66",
+          "payload": {
+            "state": "completed",
+            "stopReason": "end_turn",
+            "usage": {
+              "input_tokens": 15,
+              "cache_creation_input_tokens": 11255,
+              "cache_read_input_tokens": 40777,
+              "output_tokens": 170,
+              "server_tool_use": {
+                "web_search_requests": 0,
+                "web_fetch_requests": 0
+              },
+              "service_tier": "standard",
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 11255,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "inference_geo": "not_available",
+              "iterations": [
+                {
+                  "input_tokens": 5,
+                  "output_tokens": 9,
+                  "cache_read_input_tokens": 22468,
+                  "cache_creation_input_tokens": 4102,
+                  "cache_creation": {
+                    "ephemeral_5m_input_tokens": 0,
+                    "ephemeral_1h_input_tokens": 4102
+                  },
+                  "type": "message"
+                }
+              ],
+              "speed": "standard"
+            },
+            "modelUsage": {
+              "claude-haiku-4-5": {
+                "inputTokens": 15,
+                "outputTokens": 170,
+                "cacheReadInputTokens": 40777,
+                "cacheCreationInputTokens": 11255,
+                "webSearchRequests": 0,
+                "costUSD": 0.027452699999999997,
+                "contextWindow": 200000,
+                "maxOutputTokens": 32000
+              }
+            },
+            "totalCostUsd": 0.027452699999999997
+          },
+          "providerRefs": {}
+        }
+      }
+    },
+    {
+      "label": "reasoning",
+      "prompt": "Think step by step about whether 91 is prime, then answer with exactly `91 prime: no` and no extra prose.",
+      "turnId": "5f3401da-fddf-49a2-a02a-c69cc8cc99df",
+      "completion": {
+        "status": "turn.completed",
+        "event": {
+          "type": "turn.completed",
+          "eventId": "4a05cf87-c61e-4f9d-98b8-dbd980b534ca",
+          "provider": "claudeAgent",
+          "createdAt": "2026-07-07T15:02:06.436Z",
+          "threadId": "event-fidelity-claude-1783436515221",
+          "turnId": "5f3401da-fddf-49a2-a02a-c69cc8cc99df",
+          "payload": {
+            "state": "completed",
+            "stopReason": "end_turn",
+            "usage": {
+              "input_tokens": 10,
+              "cache_creation_input_tokens": 1321,
+              "cache_read_input_tokens": 25462,
+              "output_tokens": 202,
+              "server_tool_use": {
+                "web_search_requests": 0,
+                "web_fetch_requests": 0
+              },
+              "service_tier": "standard",
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 1321,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "inference_geo": "not_available",
+              "iterations": [
+                {
+                  "input_tokens": 10,
+                  "output_tokens": 202,
+                  "cache_read_input_tokens": 25462,
+                  "cache_creation_input_tokens": 1321,
+                  "cache_creation": {
+                    "ephemeral_5m_input_tokens": 0,
+                    "ephemeral_1h_input_tokens": 1321
+                  },
+                  "type": "message"
+                }
+              ],
+              "speed": "standard"
+            },
+            "modelUsage": {
+              "claude-haiku-4-5": {
+                "inputTokens": 25,
+                "outputTokens": 372,
+                "cacheReadInputTokens": 66239,
+                "cacheCreationInputTokens": 12576,
+                "webSearchRequests": 0,
+                "costUSD": 0.033660899999999994,
+                "contextWindow": 200000,
+                "maxOutputTokens": 32000
+              },
+              "claude-haiku-4-5-20251001": {
+                "inputTokens": 547,
+                "outputTokens": 14,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0,
+                "webSearchRequests": 0,
+                "costUSD": 0.0006169999999999999,
+                "contextWindow": 200000,
+                "maxOutputTokens": 32000
+              }
+            },
+            "totalCostUsd": 0.0342779
+          },
+          "providerRefs": {}
+        }
+      }
+    }
+  ],
+  "finishedAt": "2026-07-07T15:02:06.900Z"
+}

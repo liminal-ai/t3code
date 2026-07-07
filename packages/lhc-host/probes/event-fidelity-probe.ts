@@ -8,6 +8,7 @@ import * as NodeChildProcess from "node:child_process";
 import {
   ClaudeSettings,
   CodexSettings,
+  ModelSelection,
   ProviderDriverKind,
   ProviderInstanceId,
   ThreadId,
@@ -30,6 +31,7 @@ import { makeCodexAdapter } from "../../../apps/server/src/provider/Layers/Codex
 
 const decodeClaudeSettings = Schema.decodeSync(ClaudeSettings);
 const decodeCodexSettings = Schema.decodeSync(CodexSettings);
+const decodeModelSelection = Schema.decodeUnknownSync(ModelSelection);
 
 const providerSessionDirectoryProbeLayer = Layer.succeed(ProviderSessionDirectory, {
   upsert: () => Effect.void,
@@ -45,6 +47,7 @@ interface ProbeTurn {
   readonly label: string;
   readonly prompt: string;
   readonly interruptAfterMs?: number;
+  readonly requiresThinking?: boolean;
 }
 
 interface ProviderConfig {
@@ -83,12 +86,20 @@ const turns: ReadonlyArray<ProbeTurn> = [
       "Start a deliberately slow shell command: `for i in $(seq 1 120); do echo slow-$i; sleep 1; done`. Keep it running until interrupted.",
     interruptAfterMs: 2_000,
   },
+  {
+    label: "reasoning",
+    prompt:
+      "Think step by step about whether 91 is prime, then answer with exactly `91 prime: no` and no extra prose.",
+    requiresThinking: true,
+  },
 ];
 
 function parseArgs(): {
   readonly provider: ProviderName;
   readonly outDir: string;
   readonly includeInterrupt: boolean;
+  readonly thinking: boolean;
+  readonly turnLabels: ReadonlyArray<string> | undefined;
 } {
   const args = new Map<string, string | true>();
   for (let index = 2; index < process.argv.length; index += 1) {
@@ -111,7 +122,7 @@ function parseArgs(): {
   const rawProvider = args.get("provider");
   if (rawProvider !== "claude" && rawProvider !== "codex") {
     throw new Error(
-      "Usage: node packages/lhc-host/probes/event-fidelity-probe.ts --provider claude|codex [--out-dir DIR] [--include-interrupt]",
+      "Usage: node packages/lhc-host/probes/event-fidelity-probe.ts --provider claude|codex [--out-dir DIR] [--include-interrupt] [--thinking] [--turns label1,label2]",
     );
   }
 
@@ -120,10 +131,15 @@ function parseArgs(): {
       ? String(args.get("out-dir"))
       : NodePath.join(process.cwd(), "packages/lhc-host/test/fixtures/event-fidelity", rawProvider);
 
+  const rawTurns = args.get("turns");
   return {
     provider: rawProvider,
     outDir,
     includeInterrupt: args.has("include-interrupt"),
+    // Claude-only: select a thinking-capable model configuration so `thinking`
+    // content blocks are produced (slice 1.0 reasoning fixtures).
+    thinking: args.has("thinking"),
+    turnLabels: typeof rawTurns === "string" ? rawTurns.split(",") : undefined,
   };
 }
 
@@ -174,7 +190,11 @@ function waitForTurn(
 const runProvider = Effect.fn("runProvider")(function* (
   config: ProviderConfig,
   outDir: string,
-  includeInterrupt: boolean,
+  options: {
+    readonly includeInterrupt: boolean;
+    readonly thinking: boolean;
+    readonly turnLabels: ReadonlyArray<string> | undefined;
+  },
 ) {
   const cwd = makeScratchRepo(config.name);
   const threadId = ThreadId.make(`event-fidelity-${config.name}-${Date.now()}`);
@@ -208,15 +228,30 @@ const runProvider = Effect.fn("runProvider")(function* (
     }),
   ).pipe(Effect.forkChild);
 
+  const modelSelection =
+    options.thinking && config.name === "claude"
+      ? decodeModelSelection({
+          instanceId: config.instanceId,
+          model: "claude-haiku-4-5",
+          options: [{ id: "thinking", value: true }],
+        })
+      : undefined;
+
   const session = yield* adapter.startSession({
     provider: ProviderDriverKind.make(config.driver),
     providerInstanceId: ProviderInstanceId.make(config.instanceId),
     threadId,
     cwd,
     runtimeMode: "full-access",
+    ...(modelSelection ? { modelSelection } : {}),
   });
 
-  const selectedTurns = includeInterrupt ? turns : turns.filter((turn) => !turn.interruptAfterMs);
+  const selectedTurns = turns.filter(
+    (turn) =>
+      (options.includeInterrupt || !turn.interruptAfterMs) &&
+      (options.thinking || !turn.requiresThinking) &&
+      (!options.turnLabels || options.turnLabels.includes(turn.label)),
+  );
   const turnResults: Array<Record<string, unknown>> = [];
   for (const turn of selectedTurns) {
     const start = yield* adapter.sendTurn({
@@ -250,6 +285,7 @@ const runProvider = Effect.fn("runProvider")(function* (
         driver: config.driver,
         threadId,
         cwd,
+        ...(modelSelection ? { modelSelection } : {}),
         session,
         normalizedPath,
         nativeLogPath,
@@ -264,7 +300,11 @@ const runProvider = Effect.fn("runProvider")(function* (
 
 const main = Effect.gen(function* () {
   const args = parseArgs();
-  yield* runProvider(providers[args.provider], args.outDir, args.includeInterrupt);
+  yield* runProvider(providers[args.provider], args.outDir, {
+    includeInterrupt: args.includeInterrupt,
+    thinking: args.thinking,
+    turnLabels: args.turnLabels,
+  });
 }).pipe(
   Effect.provide(
     Layer.mergeAll(

@@ -1,0 +1,233 @@
+[
+  {
+    "kind": "turns",
+    "lines": [
+      {
+        "line": 4,
+        "type": "turn.started",
+        "turnId": "5ef8f3ed-8b34-4ee9-8c86-a6fca14bae66",
+        "payload": {}
+      },
+      {
+        "line": 27,
+        "type": "turn.completed",
+        "turnId": "5ef8f3ed-8b34-4ee9-8c86-a6fca14bae66",
+        "payload": {
+          "state": "completed",
+          "stopReason": "end_turn",
+          "usage": {
+            "input_tokens": 15,
+            "cache_creation_input_tokens": 11255,
+            "cache_read_input_tokens": 40777,
+            "output_tokens": 170,
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 11255,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "not_available",
+            "iterations": [
+              {
+                "input_tokens": 5,
+                "output_tokens": 9,
+                "cache_read_input_tokens": 22468,
+                "cache_creation_input_tokens": 4102,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 4102
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard"
+          },
+          "modelUsage": {
+            "claude-haiku-4-5": {
+              "inputTokens": 15,
+              "outputTokens": 170,
+              "cacheReadInputTokens": 40777,
+              "cacheCreationInputTokens": 11255,
+              "webSearchRequests": 0,
+              "costUSD": 0.027452699999999997,
+              "contextWindow": 200000,
+              "maxOutputTokens": 32000
+            }
+          },
+          "totalCostUsd": 0.027452699999999997
+        }
+      },
+      {
+        "line": 28,
+        "type": "turn.started",
+        "turnId": "5f3401da-fddf-49a2-a02a-c69cc8cc99df",
+        "payload": {}
+      },
+      {
+        "line": 47,
+        "type": "turn.completed",
+        "turnId": "5f3401da-fddf-49a2-a02a-c69cc8cc99df",
+        "payload": {
+          "state": "completed",
+          "stopReason": "end_turn",
+          "usage": {
+            "input_tokens": 10,
+            "cache_creation_input_tokens": 1321,
+            "cache_read_input_tokens": 25462,
+            "output_tokens": 202,
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 1321,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "not_available",
+            "iterations": [
+              {
+                "input_tokens": 10,
+                "output_tokens": 202,
+                "cache_read_input_tokens": 25462,
+                "cache_creation_input_tokens": 1321,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1321
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard"
+          },
+          "modelUsage": {
+            "claude-haiku-4-5": {
+              "inputTokens": 25,
+              "outputTokens": 372,
+              "cacheReadInputTokens": 66239,
+              "cacheCreationInputTokens": 12576,
+              "webSearchRequests": 0,
+              "costUSD": 0.033660899999999994,
+              "contextWindow": 200000,
+              "maxOutputTokens": 32000
+            },
+            "claude-haiku-4-5-20251001": {
+              "inputTokens": 547,
+              "outputTokens": 14,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0,
+              "webSearchRequests": 0,
+              "costUSD": 0.0006169999999999999,
+              "contextWindow": 200000,
+              "maxOutputTokens": 32000
+            }
+          },
+          "totalCostUsd": 0.0342779
+        }
+      }
+    ]
+  },
+  {
+    "itemId": "c4b28839-0bed-4d6c-9590-fc6259bc314d",
+    "itemType": "reasoning",
+    "eventLines": [8, 13],
+    "deltaBytesByKind": {},
+    "completedPayloadBytes": 353,
+    "completedLine": 13,
+    "completedDetailBytes": 270,
+    "completedDataBytes": 9,
+    "rawPayloadBytes": 195
+  },
+  {
+    "itemId": "c4b28839-0bed-4d6c-9590-fc6259bc314d",
+    "itemType": "unknown",
+    "eventLines": [9, 10, 11, 12],
+    "deltaBytesByKind": {
+      "reasoning_text": 270
+    },
+    "completedPayloadBytes": 0
+  },
+  {
+    "itemId": "toolu_01QmPF23SndGffUfLsakDUNg",
+    "itemType": "command_execution",
+    "eventLines": [14, 15, 18, 20],
+    "deltaBytesByKind": {},
+    "completedPayloadBytes": 132277,
+    "completedLine": 20,
+    "completedDetailBytes": 17,
+    "completedDataBytes": 132165,
+    "rawPayloadBytes": 39713
+  },
+  {
+    "itemId": "toolu_01QmPF23SndGffUfLsakDUNg",
+    "itemType": "unknown",
+    "eventLines": [19],
+    "deltaBytesByKind": {
+      "command_output": 2300
+    },
+    "completedPayloadBytes": 0
+  },
+  {
+    "itemId": "969ea49a-42c6-4b91-a726-8e4196440690",
+    "itemType": "unknown",
+    "eventLines": [22, 23],
+    "deltaBytesByKind": {
+      "assistant_text": 18
+    },
+    "completedPayloadBytes": 0
+  },
+  {
+    "itemId": "969ea49a-42c6-4b91-a726-8e4196440690",
+    "itemType": "assistant_message",
+    "eventLines": [24],
+    "deltaBytesByKind": {},
+    "completedPayloadBytes": 111,
+    "completedLine": 24,
+    "completedDetailBytes": 18,
+    "completedDataBytes": 9,
+    "rawPayloadBytes": 195
+  },
+  {
+    "itemId": "5c7c8d13-bad9-44fa-9655-1f13e552908e",
+    "itemType": "reasoning",
+    "eventLines": [31, 41],
+    "deltaBytesByKind": {},
+    "completedPayloadBytes": 520,
+    "completedLine": 41,
+    "completedDetailBytes": 431,
+    "completedDataBytes": 9,
+    "rawPayloadBytes": 195
+  },
+  {
+    "itemId": "5c7c8d13-bad9-44fa-9655-1f13e552908e",
+    "itemType": "unknown",
+    "eventLines": [32, 33, 35, 36, 37, 38, 39, 40],
+    "deltaBytesByKind": {
+      "reasoning_text": 431
+    },
+    "completedPayloadBytes": 0
+  },
+  {
+    "itemId": "b2cbb47d-72bd-4f75-a856-cdb2d3b68f4f",
+    "itemType": "unknown",
+    "eventLines": [42],
+    "deltaBytesByKind": {
+      "assistant_text": 12
+    },
+    "completedPayloadBytes": 0
+  },
+  {
+    "itemId": "b2cbb47d-72bd-4f75-a856-cdb2d3b68f4f",
+    "itemType": "assistant_message",
+    "eventLines": [43],
+    "deltaBytesByKind": {},
+    "completedPayloadBytes": 105,
+    "completedLine": 43,
+    "completedDetailBytes": 12,
+    "completedDataBytes": 9,
+    "rawPayloadBytes": 195
+  }
+]

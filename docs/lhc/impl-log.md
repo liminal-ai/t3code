@@ -87,3 +87,30 @@ launch/completion time. Newest entries at the bottom. Format:
 - next: Phase 1 — launch 1.1 (mapper, GPT-5.5 high). Mapper design must incorporate 0.2
   rulings: Claude user_prompt captured host-side from sendTurn input (not the stream);
   Claude tool-output remedy decided in 1.1 brief (adapter patch vs sidecar read).
+
+## 2026-07-07 — Slices 1.0 (ClaudeAdapter fidelity patch) and 1.2a (inference lane) done
+
+- status: done
+- who: 1.0 Fable high (run -181ff4, 21.7m), verified GPT-5.5 high (REVISE: byte-cap
+  enforcement → fixed via stat+Buffer.byteLength, 62/62 adapter tests → converged; Patch 2
+  ACCEPT outright). 1.2a Composer (run -e446ca, 4.4m), verified GPT-5.5 high (ACCEPT; zero
+  parity findings; orchestrator closed the sandbox-blocked test run: 16 passed).
+- what: **1.0** — in-fork ClaudeAdapter patches: (1) completed tool items now carry
+  `payload.data.result.fullOutput` read from the Agent SDK sidecar (10MB byte cap enforced
+  on reported size, stat size, and read bytes; failures degrade to path/size metadata;
+  never throws into the pipeline; path trusted as local sidecar metadata — accepted risk).
+  (2) Reasoning fixed at root cause: `content_block_start` ignored `thinking` blocks;
+  now `reasoning` items with `reasoning_text` deltas + completed lifecycle; snapshot
+  backfill filtered to assistant blocks. Post-patch fixtures under
+  test/fixtures/event-fidelity/claude/post-patch/ (fullOutputSize 108894; two reasoning
+  pairs); findings doc amended "(post-patch, this fork)"; pre-patch record intact.
+  3 new adapter tests; probe gained --thinking/--turns flags.
+  **1.2a** — cc-lhc `claude -p` inference lane ported near-verbatim (assignments.ts
+  byte-identical): env prefix T3CODE*LHC*\*, default concurrency 8 per concurrency
+  findings, 5 documented toolchain adaptations (effect-diagnostics pragmas, namespace
+  node imports, erasableSyntaxOnly constructor, oxfmt, claude-bin.ts). 12 hermetic tests
+  - fake-claude.mjs ported.
+- ruling: user prompts will be captured host-side at sendTurn for BOTH providers, keyed
+  by turnId, so Codex's stream user_message items dedupe against them via LHC idempotency
+  (key wins over content).
+- next: Slice 1.1 (mapper + turn accumulator, GPT-5.5 high).

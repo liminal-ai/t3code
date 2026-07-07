@@ -1000,7 +1000,7 @@ describe("ClaudeAdapterLive", () => {
     return Effect.gen(function* () {
       const adapter = yield* ClaudeAdapter;
 
-      const runtimeEventsFiber = yield* Stream.take(adapter.streamEvents, 11).pipe(
+      const runtimeEventsFiber = yield* Stream.take(adapter.streamEvents, 13).pipe(
         Stream.runCollect,
         Effect.forkChild,
       );
@@ -1110,10 +1110,12 @@ describe("ClaudeAdapterLive", () => {
           "session.state.changed",
           "turn.started",
           "thread.started",
+          "item.started",
           "content.delta",
           "item.started",
           "item.updated",
           "item.updated",
+          "item.completed",
           "item.completed",
           "turn.completed",
         ],
@@ -1128,7 +1130,26 @@ describe("ClaudeAdapterLive", () => {
         assert.equal(String(reasoningDelta.turnId), String(turn.turnId));
       }
 
-      const toolStarted = runtimeEvents.find((event) => event.type === "item.started");
+      const reasoningStarted = runtimeEvents.find(
+        (event) => event.type === "item.started" && event.payload.itemType === "reasoning",
+      );
+      assert.equal(reasoningStarted?.type, "item.started");
+      const reasoningCompleted = runtimeEvents.find(
+        (event) => event.type === "item.completed" && event.payload.itemType === "reasoning",
+      );
+      assert.equal(reasoningCompleted?.type, "item.completed");
+      if (
+        reasoningStarted?.type === "item.started" &&
+        reasoningCompleted?.type === "item.completed"
+      ) {
+        assert.equal(String(reasoningCompleted.itemId), String(reasoningStarted.itemId));
+        assert.equal(String(reasoningDelta?.itemId), String(reasoningStarted.itemId));
+        assert.equal(reasoningCompleted.payload.detail, "Let");
+      }
+
+      const toolStarted = runtimeEvents.find(
+        (event) => event.type === "item.started" && event.payload.itemType === "dynamic_tool_call",
+      );
       assert.equal(toolStarted?.type, "item.started");
       if (toolStarted?.type === "item.started") {
         assert.equal(toolStarted.payload.itemType, "dynamic_tool_call");
@@ -1171,6 +1192,387 @@ describe("ClaudeAdapterLive", () => {
     }).pipe(
       Effect.provideService(Random.Random, makeDeterministicRandomService()),
       Effect.provide(harness.layer),
+    );
+  });
+
+  it.effect("emits reasoning item lifecycle for streamed thinking blocks", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+
+      const runtimeEventsFiber = yield* Stream.take(adapter.streamEvents, 10).pipe(
+        Stream.runCollect,
+        Effect.forkChild,
+      );
+
+      const session = yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+
+      yield* adapter.sendTurn({
+        threadId: session.threadId,
+        input: "think about it",
+        attachments: [],
+      });
+
+      harness.query.emit({
+        type: "stream_event",
+        session_id: "sdk-session-reasoning",
+        uuid: "stream-thinking-start",
+        parent_tool_use_id: null,
+        event: {
+          type: "content_block_start",
+          index: 0,
+          content_block: {
+            type: "thinking",
+            thinking: "",
+            signature: "",
+          },
+        },
+      } as unknown as SDKMessage);
+
+      harness.query.emit({
+        type: "stream_event",
+        session_id: "sdk-session-reasoning",
+        uuid: "stream-thinking-delta-1",
+        parent_tool_use_id: null,
+        event: {
+          type: "content_block_delta",
+          index: 0,
+          delta: {
+            type: "thinking_delta",
+            thinking: "Is 91 prime? ",
+          },
+        },
+      } as unknown as SDKMessage);
+
+      harness.query.emit({
+        type: "stream_event",
+        session_id: "sdk-session-reasoning",
+        uuid: "stream-thinking-delta-2",
+        parent_tool_use_id: null,
+        event: {
+          type: "content_block_delta",
+          index: 0,
+          delta: {
+            type: "thinking_delta",
+            thinking: "91 = 7 * 13.",
+          },
+        },
+      } as unknown as SDKMessage);
+
+      harness.query.emit({
+        type: "stream_event",
+        session_id: "sdk-session-reasoning",
+        uuid: "stream-thinking-stop",
+        parent_tool_use_id: null,
+        event: {
+          type: "content_block_stop",
+          index: 0,
+        },
+      } as unknown as SDKMessage);
+
+      harness.query.emit({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        errors: [],
+        session_id: "sdk-session-reasoning",
+        uuid: "result-reasoning",
+      } as unknown as SDKMessage);
+
+      const runtimeEvents = Array.from(yield* Fiber.join(runtimeEventsFiber));
+      assert.deepEqual(
+        runtimeEvents.map((event) => event.type),
+        [
+          "session.started",
+          "session.configured",
+          "session.state.changed",
+          "turn.started",
+          "thread.started",
+          "item.started",
+          "content.delta",
+          "content.delta",
+          "item.completed",
+          "turn.completed",
+        ],
+      );
+
+      const started = runtimeEvents.find((event) => event.type === "item.started");
+      assert.equal(started?.type, "item.started");
+      if (started?.type === "item.started") {
+        assert.equal(started.payload.itemType, "reasoning");
+        assert.equal(started.payload.title, "Reasoning");
+      }
+
+      const deltas = runtimeEvents.filter((event) => event.type === "content.delta");
+      for (const delta of deltas) {
+        if (delta.type === "content.delta") {
+          assert.equal(delta.payload.streamKind, "reasoning_text");
+          assert.equal(String(delta.itemId), String(started?.itemId));
+        }
+      }
+
+      const completed = runtimeEvents.find((event) => event.type === "item.completed");
+      assert.equal(completed?.type, "item.completed");
+      if (completed?.type === "item.completed") {
+        assert.equal(completed.payload.itemType, "reasoning");
+        assert.equal(completed.payload.status, "completed");
+        assert.equal(completed.payload.detail, "Is 91 prime? 91 = 7 * 13.");
+        assert.equal(String(completed.itemId), String(started?.itemId));
+      }
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
+  it.effect("surfaces persisted sidecar tool output on completed tool items", () => {
+    const harness = makeHarness();
+    const sidecarDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "claude-sidecar-"));
+    const sidecarPath = NodePath.join(sidecarDir, "tool-result.txt");
+    const fullOutput = Array.from({ length: 5_000 }, (_, index) => String(index + 1)).join("\n");
+    NodeFS.writeFileSync(sidecarPath, fullOutput);
+
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+
+      const runtimeEventsFiber = yield* Stream.take(adapter.streamEvents, 10).pipe(
+        Stream.runCollect,
+        Effect.forkChild,
+      );
+
+      const session = yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+
+      yield* adapter.sendTurn({
+        threadId: session.threadId,
+        input: "run seq",
+        attachments: [],
+      });
+
+      harness.query.emit({
+        type: "stream_event",
+        session_id: "sdk-session-sidecar",
+        uuid: "stream-sidecar-tool-start",
+        parent_tool_use_id: null,
+        event: {
+          type: "content_block_start",
+          index: 0,
+          content_block: {
+            type: "tool_use",
+            id: "tool-bash-sidecar",
+            name: "Bash",
+            input: { command: "seq 1 5000" },
+          },
+        },
+      } as unknown as SDKMessage);
+
+      harness.query.emit({
+        type: "user",
+        session_id: "sdk-session-sidecar",
+        uuid: "user-sidecar-result",
+        parent_tool_use_id: null,
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "tool-bash-sidecar",
+              content: "<persisted-output>preview only</persisted-output>",
+            },
+          ],
+        },
+        tool_use_result: {
+          stdout: "<persisted-output>preview only</persisted-output>",
+          stderr: "",
+          interrupted: false,
+          persistedOutputPath: sidecarPath,
+          persistedOutputSize: Buffer.byteLength(fullOutput),
+        },
+      } as unknown as SDKMessage);
+
+      harness.query.emit({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        errors: [],
+        session_id: "sdk-session-sidecar",
+        uuid: "result-sidecar",
+      } as unknown as SDKMessage);
+
+      const runtimeEvents = Array.from(yield* Fiber.join(runtimeEventsFiber));
+
+      const completed = runtimeEvents.find((event) => event.type === "item.completed");
+      assert.equal(completed?.type, "item.completed");
+      if (completed?.type === "item.completed") {
+        const result = (
+          completed.payload.data as {
+            result?: {
+              content?: string;
+              fullOutput?: string;
+              fullOutputPath?: string;
+              fullOutputSize?: number;
+            };
+          }
+        ).result;
+        assert.equal(result?.content, "<persisted-output>preview only</persisted-output>");
+        assert.equal(result?.fullOutput, fullOutput);
+        assert.equal(result?.fullOutputPath, sidecarPath);
+        assert.equal(result?.fullOutputSize, Buffer.byteLength(fullOutput));
+      }
+
+      const updated = runtimeEvents.find(
+        (event) =>
+          event.type === "item.updated" &&
+          (event.payload.data as { result?: unknown } | undefined)?.result !== undefined,
+      );
+      assert.equal(updated?.type, "item.updated");
+      if (updated?.type === "item.updated") {
+        const result = (updated.payload.data as { result?: { fullOutput?: string } }).result;
+        assert.equal(result?.fullOutput, undefined);
+      }
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+      Effect.ensuring(
+        Effect.sync(() => NodeFS.rmSync(sidecarDir, { recursive: true, force: true })),
+      ),
+    );
+  });
+
+  it.effect("keeps persisted output metadata when the sidecar is unreadable or oversized", () => {
+    const harness = makeHarness();
+    const sidecarDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "claude-sidecar-"));
+    const missingPath = NodePath.join(sidecarDir, "missing.txt");
+    const oversizedPath = NodePath.join(sidecarDir, "oversized.txt");
+    const oversizedActualPath = NodePath.join(sidecarDir, "oversized-actual.txt");
+    NodeFS.writeFileSync(oversizedPath, "present but reported oversized");
+    NodeFS.writeFileSync(oversizedActualPath, Buffer.alloc(11 * 1024 * 1024, "a"));
+
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+
+      const runtimeEventsFiber = yield* Stream.take(adapter.streamEvents, 18).pipe(
+        Stream.runCollect,
+        Effect.forkChild,
+      );
+
+      const session = yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+
+      yield* adapter.sendTurn({
+        threadId: session.threadId,
+        input: "run commands",
+        attachments: [],
+      });
+
+      const emitToolUse = (index: number, id: string) => {
+        harness.query.emit({
+          type: "stream_event",
+          session_id: "sdk-session-sidecar-degraded",
+          uuid: `stream-${id}-start`,
+          parent_tool_use_id: null,
+          event: {
+            type: "content_block_start",
+            index,
+            content_block: {
+              type: "tool_use",
+              id,
+              name: "Bash",
+              input: { command: "seq 1 5000" },
+            },
+          },
+        } as unknown as SDKMessage);
+      };
+
+      const emitToolResult = (id: string, toolUseResult: Record<string, unknown>) => {
+        harness.query.emit({
+          type: "user",
+          session_id: "sdk-session-sidecar-degraded",
+          uuid: `user-${id}-result`,
+          parent_tool_use_id: null,
+          message: {
+            role: "user",
+            content: [
+              {
+                type: "tool_result",
+                tool_use_id: id,
+                content: "<persisted-output>preview only</persisted-output>",
+              },
+            ],
+          },
+          tool_use_result: toolUseResult,
+        } as unknown as SDKMessage);
+      };
+
+      emitToolUse(0, "tool-bash-missing");
+      emitToolUse(1, "tool-bash-oversized");
+      emitToolUse(2, "tool-bash-oversized-actual");
+      emitToolResult("tool-bash-missing", {
+        persistedOutputPath: missingPath,
+        persistedOutputSize: 42,
+      });
+      emitToolResult("tool-bash-oversized", {
+        persistedOutputPath: oversizedPath,
+        persistedOutputSize: 11 * 1024 * 1024,
+      });
+      // No reported size: the cap must still hold against the actual file size.
+      emitToolResult("tool-bash-oversized-actual", {
+        persistedOutputPath: oversizedActualPath,
+      });
+
+      harness.query.emit({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        errors: [],
+        session_id: "sdk-session-sidecar-degraded",
+        uuid: "result-sidecar-degraded",
+      } as unknown as SDKMessage);
+
+      const runtimeEvents = Array.from(yield* Fiber.join(runtimeEventsFiber));
+      const completions = runtimeEvents.filter((event) => event.type === "item.completed");
+      assert.equal(completions.length, 3);
+
+      for (const [position, expected] of [
+        { fullOutputPath: missingPath, fullOutputSize: 42 },
+        { fullOutputPath: oversizedPath, fullOutputSize: 11 * 1024 * 1024 },
+        { fullOutputPath: oversizedActualPath, fullOutputSize: 11 * 1024 * 1024 },
+      ].entries()) {
+        const completed = completions[position];
+        assert.equal(completed?.type, "item.completed");
+        if (completed?.type === "item.completed") {
+          const result = (
+            completed.payload.data as {
+              result?: {
+                content?: string;
+                fullOutput?: string;
+                fullOutputPath?: string;
+                fullOutputSize?: number;
+              };
+            }
+          ).result;
+          assert.equal(result?.content, "<persisted-output>preview only</persisted-output>");
+          assert.equal(result?.fullOutput, undefined);
+          assert.equal(result?.fullOutputPath, expected.fullOutputPath);
+          assert.equal(result?.fullOutputSize, expected.fullOutputSize);
+        }
+      }
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+      Effect.ensuring(
+        Effect.sync(() => NodeFS.rmSync(sidecarDir, { recursive: true, force: true })),
+      ),
     );
   });
 

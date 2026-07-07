@@ -92,6 +92,7 @@ const encodeUnknownJsonStringExit = Schema.encodeUnknownExit(Schema.UnknownFromJ
 const decodeUnknownJsonStringExit = Schema.decodeUnknownExit(Schema.UnknownFromJsonString);
 
 const PROVIDER = ProviderDriverKind.make("claudeAgent");
+const MAX_PERSISTED_TOOL_OUTPUT_BYTES = 10 * 1024 * 1024;
 type ClaudeTextStreamKind = Extract<RuntimeContentStreamKind, "assistant_text" | "reasoning_text">;
 type ClaudeToolResultStreamKind = Extract<
   RuntimeContentStreamKind,
@@ -140,6 +141,7 @@ interface ClaudeTurnState {
 interface AssistantTextBlockState {
   readonly itemId: string;
   readonly blockIndex: number;
+  readonly kind: "assistant_message" | "reasoning";
   emittedTextDelta: boolean;
   fallbackText: string;
   streamClosed: boolean;
@@ -1068,6 +1070,17 @@ function extractContentBlockText(block: unknown): string {
   return candidate.type === "text" && typeof candidate.text === "string" ? candidate.text : "";
 }
 
+function extractThinkingBlockText(block: unknown): string {
+  if (!block || typeof block !== "object") {
+    return "";
+  }
+
+  const candidate = block as { type?: unknown; thinking?: unknown };
+  return candidate.type === "thinking" && typeof candidate.thinking === "string"
+    ? candidate.thinking
+    : "";
+}
+
 function extractTextContent(value: unknown): string {
   if (typeof value === "string") {
     return value;
@@ -1468,6 +1481,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     context: ClaudeSessionContext,
     blockIndex: number,
     options?: {
+      readonly kind?: AssistantTextBlockState["kind"];
       readonly fallbackText?: string;
       readonly streamClosed?: boolean;
     },
@@ -1491,6 +1505,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     const block: AssistantTextBlockState = {
       itemId: yield* randomUUIDv4,
       blockIndex,
+      kind: options?.kind ?? "assistant_message",
       emittedTextDelta: false,
       fallbackText: options?.fallbackText ?? "",
       streamClosed: options?.streamClosed ?? false,
@@ -1516,6 +1531,52 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       });
     },
   );
+
+  const ensureReasoningBlock = Effect.fn("ensureReasoningBlock")(function* (
+    context: ClaudeSessionContext,
+    blockIndex: number,
+    options?: {
+      readonly fallbackText?: string;
+      readonly rawMethod?: string;
+      readonly rawPayload?: unknown;
+    },
+  ) {
+    const existing = context.turnState?.assistantTextBlocks.get(blockIndex);
+    const entry = yield* ensureAssistantTextBlock(context, blockIndex, {
+      kind: "reasoning",
+      ...(options?.fallbackText !== undefined ? { fallbackText: options.fallbackText } : {}),
+    });
+    if (!entry || entry.block === existing || !context.turnState) {
+      return entry;
+    }
+
+    const stamp = yield* makeEventStamp();
+    yield* offerRuntimeEvent({
+      type: "item.started",
+      eventId: stamp.eventId,
+      provider: PROVIDER,
+      createdAt: stamp.createdAt,
+      threadId: context.session.threadId,
+      turnId: context.turnState.turnId,
+      itemId: asRuntimeItemId(entry.block.itemId),
+      payload: {
+        itemType: "reasoning",
+        status: "inProgress",
+        title: "Reasoning",
+      },
+      providerRefs: nativeProviderRefs(context),
+      ...(options?.rawMethod || options?.rawPayload
+        ? {
+            raw: {
+              source: "claude.sdk.message" as const,
+              ...(options.rawMethod ? { method: options.rawMethod } : {}),
+              payload: options?.rawPayload,
+            },
+          }
+        : {}),
+    });
+    return entry;
+  });
 
   const completeAssistantTextBlock = Effect.fn("completeAssistantTextBlock")(function* (
     context: ClaudeSessionContext,
@@ -1546,7 +1607,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         turnId: turnState.turnId,
         itemId: asRuntimeItemId(block.itemId),
         payload: {
-          streamKind: "assistant_text",
+          streamKind: block.kind === "reasoning" ? "reasoning_text" : "assistant_text",
           delta: block.fallbackText,
         },
         providerRefs: nativeProviderRefs(context),
@@ -1577,9 +1638,9 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       threadId: context.session.threadId,
       turnId: turnState.turnId,
       payload: {
-        itemType: "assistant_message",
+        itemType: block.kind === "reasoning" ? "reasoning" : "assistant_message",
         status: "completed",
-        title: "Assistant message",
+        title: block.kind === "reasoning" ? "Reasoning" : "Assistant message",
         ...(block.fallbackText.length > 0 ? { detail: block.fallbackText } : {}),
       },
       providerRefs: nativeProviderRefs(context),
@@ -1608,10 +1669,12 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       return;
     }
 
-    const orderedBlocks = turnState.assistantTextBlockOrder.map((block) => ({
-      blockIndex: block.blockIndex,
-      block,
-    }));
+    const orderedBlocks = turnState.assistantTextBlockOrder
+      .filter((block) => block.kind === "assistant_message")
+      .map((block) => ({
+        blockIndex: block.blockIndex,
+        block,
+      }));
 
     for (const [position, text] of snapshotTextBlocks.entries()) {
       const existingEntry = orderedBlocks[position];
@@ -2111,16 +2174,17 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         const assistantBlockEntry =
           event.delta.type === "text_delta"
             ? yield* ensureAssistantTextBlock(context, event.index)
-            : context.turnState.assistantTextBlocks.get(event.index)
-              ? {
-                  blockIndex: event.index,
-                  block: context.turnState.assistantTextBlocks.get(
-                    event.index,
-                  ) as AssistantTextBlockState,
-                }
-              : undefined;
-        if (assistantBlockEntry?.block && event.delta.type === "text_delta") {
+            : yield* ensureReasoningBlock(context, event.index, {
+                rawMethod: "claude/stream_event/content_block_delta",
+                rawPayload: message,
+              });
+        if (assistantBlockEntry?.block) {
           assistantBlockEntry.block.emittedTextDelta = true;
+          if (event.delta.type === "thinking_delta") {
+            // Reasoning text is not backfilled from assistant message snapshots
+            // (only text blocks are), so accumulate it for the completed detail.
+            assistantBlockEntry.block.fallbackText += deltaText;
+          }
         }
         const stamp = yield* makeEventStamp();
         yield* offerRuntimeEvent({
@@ -2253,6 +2317,14 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         });
         return;
       }
+      if (block.type === "thinking") {
+        yield* ensureReasoningBlock(context, index, {
+          fallbackText: extractThinkingBlockText(block),
+          rawMethod: "claude/stream_event/content_block_start",
+          rawPayload: message,
+        });
+        return;
+      }
       if (
         block.type !== "tool_use" &&
         block.type !== "server_tool_use" &&
@@ -2333,6 +2405,58 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     }
   });
 
+  // Claude Code persists large tool outputs to a sidecar file and replaces the
+  // inline tool-result content with a short `<persisted-output>` preview. The
+  // preview is lossy, so completed tool items surface the sidecar content as
+  // `result.fullOutput` (path/size metadata is kept even when the read fails
+  // or the output exceeds the cap, so capture consumers can note the gap).
+  const resolvePersistedToolOutput = Effect.fn("resolvePersistedToolOutput")(function* (
+    toolUseResult: Record<string, unknown> | undefined,
+  ) {
+    const persistedPath =
+      typeof toolUseResult?.persistedOutputPath === "string" &&
+      toolUseResult.persistedOutputPath.length > 0
+        ? toolUseResult.persistedOutputPath
+        : undefined;
+    if (persistedPath === undefined) {
+      return undefined;
+    }
+
+    const reportedSize =
+      typeof toolUseResult?.persistedOutputSize === "number"
+        ? toolUseResult.persistedOutputSize
+        : undefined;
+    if (reportedSize !== undefined && reportedSize > MAX_PERSISTED_TOOL_OUTPUT_BYTES) {
+      return { fullOutputPath: persistedPath, fullOutputSize: reportedSize };
+    }
+
+    // The reported size is a cheap first gate but can be absent or under-report,
+    // so the cap is also enforced against the sidecar's actual on-disk size.
+    const statInfo = yield* fileSystem
+      .stat(persistedPath)
+      .pipe(Effect.orElseSucceed(() => undefined));
+    const actualSize = statInfo === undefined ? undefined : Number(statInfo.size);
+    const fullOutputSize = reportedSize ?? actualSize;
+    const metadata = {
+      fullOutputPath: persistedPath,
+      ...(fullOutputSize !== undefined ? { fullOutputSize } : {}),
+    };
+    if (actualSize === undefined || actualSize > MAX_PERSISTED_TOOL_OUTPUT_BYTES) {
+      return metadata;
+    }
+
+    const fullOutput = yield* fileSystem
+      .readFileString(persistedPath)
+      .pipe(Effect.orElseSucceed(() => undefined));
+    if (
+      fullOutput === undefined ||
+      Buffer.byteLength(fullOutput, "utf8") > MAX_PERSISTED_TOOL_OUTPUT_BYTES
+    ) {
+      return metadata;
+    }
+    return { ...metadata, fullOutput };
+  });
+
   const handleUserMessage = Effect.fn("handleUserMessage")(function* (
     context: ClaudeSessionContext,
     message: SDKMessage,
@@ -2361,6 +2485,10 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         input: tool.input,
         result: toolResult.block,
       };
+      const persistedOutput = yield* resolvePersistedToolOutput(toolUseResult);
+      const completedToolData = persistedOutput
+        ? { ...toolData, result: { ...toolResult.block, ...persistedOutput } }
+        : toolData;
 
       const updatedStamp = yield* makeEventStamp();
       yield* offerRuntimeEvent({
@@ -2428,7 +2556,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
           status: itemStatus,
           title: tool.title,
           ...(tool.detail ? { detail: tool.detail } : {}),
-          data: toolData,
+          data: completedToolData,
         },
         providerRefs: nativeProviderRefs(context, {
           providerItemId: tool.itemId,
