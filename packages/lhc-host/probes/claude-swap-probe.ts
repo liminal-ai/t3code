@@ -288,10 +288,10 @@ function runRebuild(): void {
 
   // Envelope fields from the newest user/assistant line of the real rollout.
   const envelopeSource = [...sourceLines]
-    .reverse()
+    .toReversed()
     .find((line) => line.type === "user" || line.type === "assistant");
   if (!envelopeSource) throw new Error("No user/assistant line in baseline rollout");
-  const assistantSource = [...sourceLines].reverse().find((line) => line.type === "assistant");
+  const assistantSource = [...sourceLines].toReversed().find((line) => line.type === "assistant");
   const assistantModel = (assistantSource?.message?.model as string | undefined) ?? CHEAP_MODEL;
 
   const newSessionId = NodeCrypto.randomUUID();
