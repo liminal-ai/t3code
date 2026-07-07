@@ -109,7 +109,8 @@ function mapSwapError(error: ClaudeSwapError): LhcHttpResponse {
     error.code === "busy" ||
     error.code === "swap_in_progress" ||
     error.code === "flip_contested" ||
-    error.code === "missing_provider_binding"
+    error.code === "missing_provider_binding" ||
+    error.code === "unsupported_provider"
   ) {
     return jsonError(409, error.code, error.message, extra);
   }

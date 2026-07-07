@@ -71,7 +71,7 @@ import { vi } from "vite-plus/test";
 const TEST_EPOCH = DateTime.makeUnsafe("1970-01-01T00:00:00.000Z");
 
 import * as ServerConfig from "./config.ts";
-import { makeRoutesLayer } from "./server.ts";
+import { lhcSwapDispatchTarget, makeRoutesLayer } from "./server.ts";
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
 import * as GitManager from "./git/GitManager.ts";
 import * as Keybindings from "./keybindings.ts";
@@ -1230,6 +1230,12 @@ const getWsServerUrl = (
       yield* getAuthenticatedSessionCookieHeader(options?.credential),
     );
   });
+
+it("routes LHC swap dispatch by captured provider kind", () => {
+  assert.equal(lhcSwapDispatchTarget("claudeAgent"), "claude");
+  assert.equal(lhcSwapDispatchTarget("codex"), "codex");
+  assert.equal(lhcSwapDispatchTarget("opencode"), "unsupported");
+});
 
 it.layer(NodeServices.layer)("server router seam", (it) => {
   it.effect("serves static index content for GET / when staticDir is configured", () =>

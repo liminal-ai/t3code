@@ -39,6 +39,8 @@ export interface WriteRebuiltRolloutResult {
   sessionId: string;
   rolloutPath: string;
   lineCount: number;
+  /** Total lines the handoff capture expects to re-intake from the written file. */
+  expectedReintakeLines: number;
   /**
    * Lines the handoff capture must hard-skip as replayed served-view content.
    * The trailing swap-receipt lines are NOT among them: the receipt is
@@ -183,5 +185,11 @@ export async function writeRebuiltRollout(
   assertRolloutIdentityInvariant(newSessionId, lines, rolloutPath);
   await writeFileFsyncAtomic(rolloutPath, serializeRolloutLines(lines));
 
-  return { sessionId: newSessionId, rolloutPath, lineCount: lines.length, replayedPrefixLines };
+  return {
+    sessionId: newSessionId,
+    rolloutPath,
+    lineCount: lines.length,
+    expectedReintakeLines: lines.length,
+    replayedPrefixLines,
+  };
 }

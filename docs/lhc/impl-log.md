@@ -274,3 +274,24 @@ launch/completion time. Newest entries at the bottom. Format:
 - ruling: 4.1 = CONSUME — codex-lhc has a complete rebuilder (src/rollout + tests +
   format report); Composer ports it, pattern proven twice (1.2a, 2.1).
 - next: 4.1 port (Composer, worktree), then 4.2 codex swap orchestration (GPT-5.5).
+
+## 2026-07-07 — Slice 4.2: codex swap orchestration + shared core refactor done
+
+- status: done
+- who: GPT-5.5 high (run -c623d7, 12.7m; backfill -6c27a1, 3.0m), verified Fable high
+  (run -8e2689, 6.7m: ACCEPT — strongest-form item 1: claude.test.ts diff EMPTY, all 2.2
+  invariants traced into core.ts; findings backfilled → converged)
+- what: swap/core.ts — provider-agnostic orchestration skeleton (lineage, busy, lock,
+  LHC op, render, quiesce, rebuild, preflip, flip-last, contested guard, receipt) with
+  injected provider strategies. claude.ts/codex.ts strategies: Claude cursor
+  {threadId,resume,turnCount}; codex bare {threadId} (thread id IS rollout session id).
+  CodexSwapHome.ts resolves codex:home:<path> continuation key (no env.HOME edge —
+  CODEX_HOME passed explicitly to app-server; verifier confirmed). Endpoints route by
+  lineage providerKind with loud unsupported_provider on mismatch (double-checked at
+  read-binding). expectedReintakeLines unified (= total written lines, both providers).
+  Route dispatch unit-tested (lhcSwapDispatchTarget). Full mirror test set incl.
+  idle-retry + cross-thread. 79 lhc-host + 102 server tests green.
+- open risks for 4.3 (verifier list): server codex dispatch first real exercise;
+  second-swap cwd resolution when no active session (runtimePayload overwrite drops
+  cwd — pre-existing, shared with Claude); authOverlay CODEX_HOME sessions placement.
+- next: Slice 4.3 — codex live acceptance (mirror of 2.4, plus the 4.2 risk list).

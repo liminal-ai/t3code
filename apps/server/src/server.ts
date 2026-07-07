@@ -11,7 +11,6 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Path from "effect/Path";
 import {
   FetchHttpClient,
   HttpRouter,
@@ -47,12 +46,19 @@ import {
 import * as ProviderServiceApi from "./provider/Services/ProviderService.ts";
 import * as ProviderSessionDirectoryApi from "./provider/Services/ProviderSessionDirectory.ts";
 import { deriveClaudeSwapHomePath } from "./provider/Drivers/ClaudeSwapHome.ts";
+import { deriveCodexSwapHomePath } from "./provider/Drivers/CodexSwapHome.ts";
 import { LhcCaptureService, makeLhcCaptureLayer } from "@t3tools/lhc-host/server-layer";
 import {
+  ClaudeSwapError,
+  codexSessionsDirFromHome,
   createClaudeSwapController,
+  createCodexSwapController,
+  claudeProjectsDirFromHome,
   persistedCwdFromBindingOrSession,
   type ClaudeActiveSession,
   type ClaudeProviderBinding,
+  type CodexActiveSession,
+  type CodexProviderBinding,
 } from "@t3tools/lhc-host/swap";
 import { handleLhcHttpRequest } from "@t3tools/lhc-host/http";
 import { ProviderSessionReaperLive } from "./provider/Layers/ProviderSessionReaper.ts";
@@ -130,6 +136,15 @@ import { disableTailscaleServe, ensureTailscaleServe } from "@t3tools/tailscale"
 // already closes the websocket gracefully. Do not add an artificial drain before
 // those finalizers get a chance to run.
 const HTTP_PREEMPTIVE_SHUTDOWN_GRACE_MS = 0;
+
+export type LhcSwapDispatchTarget = "claude" | "codex" | "unsupported";
+
+export function lhcSwapDispatchTarget(providerKind: string | undefined): LhcSwapDispatchTarget {
+  if (providerKind === "codex") return "codex";
+  if (providerKind === "claudeAgent" || providerKind === undefined) return "claude";
+  return "unsupported";
+}
+
 function makeLhcRouteLayer(method: "GET" | "POST", path: string) {
   return HttpRouter.add(
     method,
@@ -151,41 +166,54 @@ function makeLhcRouteLayer(method: "GET" | "POST", path: string) {
       const capture = yield* LhcCaptureService;
       const providerService = yield* ProviderServiceApi.ProviderService;
       const directory = yield* ProviderSessionDirectoryApi.ProviderSessionDirectory;
-      const pathService = yield* Path.Path;
       const runtimeContext = yield* Effect.context<never>();
       const runPromise = Effect.runPromiseWith(runtimeContext);
 
-      const controller = createClaudeSwapController({
+      const listSessions = async () =>
+        runPromise(providerService.listSessions()) as Promise<readonly ClaudeActiveSession[]>;
+      const stopSession = async (threadId: string) =>
+        runPromise(providerService.stopSession({ threadId: ThreadId.make(threadId) }));
+      const readBinding = async (threadId: string) => {
+        const option = await runPromise(directory.getBinding(ThreadId.make(threadId)));
+        if (Option.isNone(option)) return undefined;
+        return option.value as ClaudeProviderBinding;
+      };
+      const writeResumeCursor = async ({
+        threadId,
+        binding,
+        resumeCursor,
+      }: {
+        threadId: string;
+        binding: ClaudeProviderBinding;
+        resumeCursor: unknown;
+      }) => {
+        const lastRuntimeEventAt = DateTime.formatIso(await runPromise(DateTime.now));
+        const swapProvider = binding.provider === "codex" ? "codex" : "claude";
+        const upsertInput = {
+          threadId: ThreadId.make(threadId),
+          provider: ProviderDriverKind.make(binding.provider),
+          ...(binding.providerInstanceId !== undefined
+            ? { providerInstanceId: ProviderInstanceId.make(binding.providerInstanceId) }
+            : {}),
+          ...(binding.runtimeMode !== undefined
+            ? { runtimeMode: binding.runtimeMode as RuntimeMode }
+            : {}),
+          resumeCursor,
+          runtimePayload: {
+            lastRuntimeEvent: `lhc.${swapProvider}-swap.cursor-flip`,
+            lastRuntimeEventAt,
+          },
+        };
+        await runPromise(directory.upsert(upsertInput));
+      };
+
+      const claudeController = createClaudeSwapController({
         capture,
         provider: {
-          listSessions: async () =>
-            runPromise(providerService.listSessions()) as Promise<readonly ClaudeActiveSession[]>,
-          stopSession: async (threadId) =>
-            runPromise(providerService.stopSession({ threadId: ThreadId.make(threadId) })),
-          readBinding: async (threadId) => {
-            const option = await runPromise(directory.getBinding(ThreadId.make(threadId)));
-            if (Option.isNone(option)) return undefined;
-            return option.value as ClaudeProviderBinding;
-          },
-          writeResumeCursor: async ({ threadId, binding, resumeCursor }) => {
-            const lastRuntimeEventAt = DateTime.formatIso(await runPromise(DateTime.now));
-            const upsertInput = {
-              threadId: ThreadId.make(threadId),
-              provider: ProviderDriverKind.make(binding.provider),
-              ...(binding.providerInstanceId !== undefined
-                ? { providerInstanceId: ProviderInstanceId.make(binding.providerInstanceId) }
-                : {}),
-              ...(binding.runtimeMode !== undefined
-                ? { runtimeMode: binding.runtimeMode as RuntimeMode }
-                : {}),
-              resumeCursor,
-              runtimePayload: {
-                lastRuntimeEvent: "lhc.claude-swap.cursor-flip",
-                lastRuntimeEventAt,
-              },
-            };
-            await runPromise(directory.upsert(upsertInput));
-          },
+          listSessions,
+          stopSession,
+          readBinding,
+          writeResumeCursor,
           resolvePaths: async ({ binding, activeSession }) => {
             if (binding.providerInstanceId === undefined) {
               throw new Error("Provider binding is missing providerInstanceId.");
@@ -203,11 +231,80 @@ function makeLhcRouteLayer(method: "GET" | "POST", path: string) {
             return {
               cwd,
               claudeHomePath,
-              claudeProjectsDir: pathService.join(claudeHomePath, ".claude", "projects"),
+              claudeProjectsDir: claudeProjectsDirFromHome(claudeHomePath),
             };
           },
         },
       });
+
+      const codexController = createCodexSwapController({
+        capture,
+        provider: {
+          listSessions: listSessions as () => Promise<readonly CodexActiveSession[]>,
+          stopSession,
+          readBinding: readBinding as (
+            threadId: string,
+          ) => Promise<CodexProviderBinding | undefined>,
+          writeResumeCursor,
+          resolvePaths: async ({ binding, activeSession }) => {
+            if (binding.providerInstanceId === undefined) {
+              throw new Error("Provider binding is missing providerInstanceId.");
+            }
+            const info = await runPromise(
+              providerService.getInstanceInfo(ProviderInstanceId.make(binding.providerInstanceId)),
+            );
+            const codexHome = deriveCodexSwapHomePath(info.continuationIdentity.continuationKey);
+            const cwd = persistedCwdFromBindingOrSession({ binding, activeSession });
+            if (cwd === undefined) {
+              throw new Error("Codex thread has no persisted cwd.");
+            }
+            return {
+              cwd,
+              codexHome,
+              codexSessionsDir: codexSessionsDirFromHome(codexHome),
+            };
+          },
+        },
+      });
+
+      const providerKindForThread = (threadId: string): string | undefined =>
+        capture.listCapturedThreads().find((row) => row.t3ThreadId === threadId)?.providerKind;
+      const controller = {
+        status: () => claudeController.status(),
+        inspectThread: (threadId: string) => claudeController.inspectThread(threadId),
+        compactThread: (
+          threadId: string,
+          options?: Parameters<typeof claudeController.compactThread>[1],
+        ) => {
+          const providerKind = providerKindForThread(threadId);
+          const dispatchTarget = lhcSwapDispatchTarget(providerKind);
+          if (dispatchTarget === "codex") return codexController.compactThread(threadId, options);
+          if (dispatchTarget === "claude") {
+            return claudeController.compactThread(threadId, options);
+          }
+          throw new ClaudeSwapError({
+            code: "unsupported_provider",
+            message: `Thread '${threadId}' is bound to unsupported provider '${providerKind}'.`,
+            stepReached: "read-binding",
+          });
+        },
+        pruneThread: (
+          threadId: string,
+          options?: Parameters<typeof claudeController.pruneThread>[1],
+        ) => {
+          const providerKind = providerKindForThread(threadId);
+          const dispatchTarget = lhcSwapDispatchTarget(providerKind);
+          if (dispatchTarget === "codex") return codexController.pruneThread(threadId, options);
+          if (dispatchTarget === "claude") {
+            return claudeController.pruneThread(threadId, options);
+          }
+          throw new ClaudeSwapError({
+            code: "unsupported_provider",
+            message: `Thread '${threadId}' is bound to unsupported provider '${providerKind}'.`,
+            stepReached: "read-binding",
+          });
+        },
+      };
 
       const body =
         method === "POST" ? yield* request.json.pipe(Effect.orElseSucceed(() => ({}))) : undefined;

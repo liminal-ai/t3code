@@ -53,6 +53,7 @@ describe("LHC HTTP handler", () => {
       "swap_in_progress",
       "flip_contested",
       "missing_provider_binding",
+      "unsupported_provider",
     ] as const) {
       const result = await handleLhcHttpRequest(
         controller({
@@ -60,8 +61,11 @@ describe("LHC HTTP handler", () => {
             throw new ClaudeSwapError({
               code,
               message: code,
-              stepReached: code === "missing_provider_binding" ? "read-binding" : "busy-check",
-              retriable: code !== "missing_provider_binding",
+              stepReached:
+                code === "missing_provider_binding" || code === "unsupported_provider"
+                  ? "read-binding"
+                  : "busy-check",
+              retriable: code !== "missing_provider_binding" && code !== "unsupported_provider",
             });
           },
         }),
@@ -74,8 +78,11 @@ describe("LHC HTTP handler", () => {
           ok: false,
           error: {
             code,
-            stepReached: code === "missing_provider_binding" ? "read-binding" : "busy-check",
-            retriable: code !== "missing_provider_binding",
+            stepReached:
+              code === "missing_provider_binding" || code === "unsupported_provider"
+                ? "read-binding"
+                : "busy-check",
+            retriable: code !== "missing_provider_binding" && code !== "unsupported_provider",
           },
         },
       });
