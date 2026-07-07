@@ -1,0 +1,93 @@
+{
+  "codexVersion": "codex-cli 0.142.5",
+  "codexHome": "/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-codex-swap-home-zXofq3",
+  "cwd": "/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-codex-swap-cwd-P39l8F",
+  "baseline": {
+    "t3ThreadId": "codex-swap-baseline-1783460510384",
+    "startCursor": {
+      "threadId": "019f3e87-bb2f-7f32-9637-11603afb3dbf"
+    },
+    "finalCursor": {
+      "threadId": "019f3e87-bb2f-7f32-9637-11603afb3dbf"
+    },
+    "providerThreadId": "019f3e87-bb2f-7f32-9637-11603afb3dbf",
+    "rolloutPath": "/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-codex-swap-home-zXofq3/sessions/2026/07/07/rollout-2026-07-07T17-41-50-019f3e87-bb2f-7f32-9637-11603afb3dbf.jsonl",
+    "lineCount": 20,
+    "providerThreadIds": ["019f3e87-bb2f-7f32-9637-11603afb3dbf"],
+    "checkAnswer": "4812"
+  },
+  "sanity": {
+    "t3ThreadId": "codex-swap-sanity-1783460517364",
+    "startCursor": {
+      "threadId": "019f3e87-bb2f-7f32-9637-11603afb3dbf"
+    },
+    "finalCursor": {
+      "threadId": "019f3e87-bb2f-7f32-9637-11603afb3dbf"
+    },
+    "answer": "SILVER-HARBOR-31"
+  },
+  "syntheticSameProcess": {
+    "warmThreadId": "019f3e8a-6746-71f3-aa7c-ae215a3f5139",
+    "syntheticId": "acb7a28f-aa9b-44a4-898f-8ee364671e85",
+    "rolloutPath": "/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-codex-swap-home-zXofq3/sessions/2026/07/07/rollout-2026-07-07T17-44-45-acb7a28f-aa9b-44a4-898f-8ee364671e85.jsonl",
+    "beforeLineCount": 5,
+    "afterLineCount": 15,
+    "resumedThreadId": "acb7a28f-aa9b-44a4-898f-8ee364671e85",
+    "turnId": "019f3e8a-67b1-7513-93c8-ce57d38dce60",
+    "answer": "BRONZE-HARBOR-77"
+  },
+  "syntheticFreshProcess": {
+    "syntheticId": "b03bc96e-2848-450d-89db-b401f4f70473",
+    "rolloutPath": "/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-codex-swap-home-zXofq3/sessions/2026/07/07/rollout-2026-07-07T17-44-51-b03bc96e-2848-450d-89db-b401f4f70473.jsonl",
+    "beforeLineCount": 5,
+    "afterLineCount": 15,
+    "resumedThreadId": "b03bc96e-2848-450d-89db-b401f4f70473",
+    "turnId": "019f3e8a-7fcb-7951-bb62-c29e7705df75",
+    "answer": "COPPER-LANTERN-88"
+  },
+  "failureModes": {
+    "missingId": "b375ee7e-c818-4b97-b0a2-c6ac8acf090b",
+    "missing": {
+      "ok": false,
+      "name": "CodexAppServerRequestError",
+      "message": "no rollout found for thread id b375ee7e-c818-4b97-b0a2-c6ac8acf090b",
+      "error": "CodexAppServerRequestError: no rollout found for thread id b375ee7e-c818-4b97-b0a2-c6ac8acf090b"
+    },
+    "malformedId": "b9a66d1a-176f-4ddd-9b0e-69183e2de0a5",
+    "malformedPath": "/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-codex-swap-home-zXofq3/sessions/2026/07/07/rollout-2026-07-07T17-46-15-b9a66d1a-176f-4ddd-9b0e-69183e2de0a5.jsonl",
+    "malformed": {
+      "ok": false,
+      "name": "CodexAppServerRequestError",
+      "message": "failed to read thread: thread-store internal error: failed to read thread /private/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-codex-swap-home-zXofq3/sessions/2026/07/07/rollout-2026-07-07T17-46-15-b9a66d1a-176f-4ddd-9b0e-69183e2de0a5.jsonl: rollout at /private/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-codex-swap-home-zXofq3/sessions/2026/07/07/rollout-2026-07-07T17-46-15-b9a66d1a-176f-4ddd-9b0e-69183e2de0a5.jsonl does not start with session metadata",
+      "error": "CodexAppServerRequestError: failed to read thread: thread-store internal error: failed to read thread /private/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-codex-swap-home-zXofq3/sessions/2026/07/07/rollout-2026-07-07T17-46-15-b9a66d1a-176f-4ddd-9b0e-69183e2de0a5.jsonl: rollout at /private/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-codex-swap-home-zXofq3/sessions/2026/07/07/rollout-2026-07-07T17-46-15-b9a66d1a-176f-4ddd-9b0e-69183e2de0a5.jsonl does not start with session metadata"
+    },
+    "malformedLaterId": "f9d2a3c5-d8f7-4446-9ebf-6087f94376f1",
+    "malformedLaterPath": "/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-codex-swap-home-zXofq3/sessions/2026/07/07/rollout-2026-07-07T17-46-15-f9d2a3c5-d8f7-4446-9ebf-6087f94376f1.jsonl",
+    "malformedLater": {
+      "ok": true,
+      "threadId": "f9d2a3c5-d8f7-4446-9ebf-6087f94376f1",
+      "path": "/private/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-codex-swap-home-zXofq3/sessions/2026/07/07/rollout-2026-07-07T17-46-15-f9d2a3c5-d8f7-4446-9ebf-6087f94376f1.jsonl",
+      "preview": "Synthetic prior fact: deployment codename MALFORMED-LATER; checksum 314159.",
+      "turnCount": 1
+    },
+    "filenameId": "e45b0859-a483-43f8-b954-607088a34e23",
+    "metaId": "97a688d3-3b52-4698-80d2-2359545e6ca0",
+    "mismatchPath": "/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-codex-swap-home-zXofq3/sessions/2026/07/07/rollout-2026-07-07T17-46-15-e45b0859-a483-43f8-b954-607088a34e23.jsonl",
+    "mismatch": {
+      "ok": true,
+      "threadId": "97a688d3-3b52-4698-80d2-2359545e6ca0",
+      "path": "/private/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-codex-swap-home-zXofq3/sessions/2026/07/07/rollout-2026-07-07T17-46-15-e45b0859-a483-43f8-b954-607088a34e23.jsonl",
+      "preview": "Synthetic prior fact: deployment codename MISMATCH; checksum 314159.",
+      "turnCount": 1
+    }
+  },
+  "forkBonus": {
+    "ok": true,
+    "sourceThreadId": "b03bc96e-2848-450d-89db-b401f4f70473",
+    "threadId": "019f3e8b-1f5f-7ea3-8bc9-346ea85982c1",
+    "path": "/private/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-codex-swap-home-zXofq3/sessions/2026/07/07/rollout-2026-07-07T17-45-32-019f3e8b-1f5f-7ea3-8bc9-346ea85982c1.jsonl",
+    "forkedFromId": "b03bc96e-2848-450d-89db-b401f4f70473",
+    "preview": "Synthetic prior fact: deployment codename COPPER-LANTERN-88; checksum 314159.",
+    "turnCount": 2
+  }
+}

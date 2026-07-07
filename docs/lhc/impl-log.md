@@ -256,3 +256,21 @@ launch/completion time. Newest entries at the bottom. Format:
   issues), known limits — verifier-audited line-by-line against code.
 - next: Phase 4 — Slice 4.0 (codex synthetic thread/resume probe, the last structural
   unknown), then 4.1 rebuilder + 4.2 swap orchestration + 4.3 acceptance.
+
+## 2026-07-07 — Slice 4.0: codex synthetic thread/resume probe — LAST STRUCTURAL UNKNOWN RETIRED
+
+- status: done (verdict: WORKS, same-process AND fresh-process, no restart needed)
+- who: GPT-5.5 high (run -f644aa, 11.0m, 6 paid turns), orchestrator-verified (doc
+  quality read: mirrors claude-swap.md rigor)
+- what: docs/lhc/findings/codex-swap.md. app-server thread/resume loads synthetic
+  rollouts from disk on demand — even files written AFTER process start. Codename recall
+  proven both paths; new turns append to synthetic files. Codex cursor shape is bare
+  { threadId } (no separate resume field — the thread id IS the rollout session id).
+  Traps: missing file = clean error; malformed first line = hard reject; later malformed
+  lines silently skipped (don't rely); filename-vs-session_meta id MISMATCH IS ACCEPTED
+  but returns the session_meta id — would silently poison the persisted cursor (4.1's
+  writer must enforce filename == session_meta id). Bonus: thread/fork works from
+  synthetic rollouts (fallback/canonicalization tool, not needed).
+- ruling: 4.1 = CONSUME — codex-lhc has a complete rebuilder (src/rollout + tests +
+  format report); Composer ports it, pattern proven twice (1.2a, 2.1).
+- next: 4.1 port (Composer, worktree), then 4.2 codex swap orchestration (GPT-5.5).
