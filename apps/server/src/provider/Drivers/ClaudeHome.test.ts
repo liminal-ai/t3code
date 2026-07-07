@@ -1,4 +1,7 @@
+// @effect-diagnostics nodeBuiltinImport:off
+import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";
@@ -11,6 +14,7 @@ import {
   makeClaudeEnvironment,
   resolveClaudeHomePath,
 } from "./ClaudeHome.ts";
+import { deriveClaudeSwapHomePath } from "./ClaudeSwapHome.ts";
 
 it.layer(NodeServices.layer)("ClaudeHome", (it) => {
   describe("Claude home resolution", () => {
@@ -47,6 +51,32 @@ it.layer(NodeServices.layer)("ClaudeHome", (it) => {
         expect(yield* makeClaudeContinuationGroupKey({ homePath: "" })).toBe(
           `claude:home:${resolved}`,
         );
+      }),
+    );
+
+    it.effect("derives default swap HOME from process HOME and realpaths it", () =>
+      Effect.gen(function* () {
+        const tmp = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "claude-swap-home-"));
+        try {
+          const realHome = NodePath.join(tmp, "real-home");
+          const linkedHome = NodePath.join(tmp, "linked-home");
+          NodeFS.mkdirSync(realHome);
+          NodeFS.symlinkSync(realHome, linkedHome);
+
+          const osHome = NodePath.join(tmp, "os-home");
+          const continuationKey = `claude:home:${osHome}`;
+          const derived = yield* Effect.promise(() =>
+            deriveClaudeSwapHomePath({
+              continuationKey,
+              env: { HOME: `${linkedHome}${NodePath.sep}` },
+              osHomeDir: osHome,
+            }),
+          );
+
+          expect(derived).toBe(NodeFS.realpathSync(realHome));
+        } finally {
+          NodeFS.rmSync(tmp, { recursive: true, force: true });
+        }
       }),
     );
   });

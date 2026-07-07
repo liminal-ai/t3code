@@ -106,6 +106,15 @@ export interface CaptureService {
   noteTurnStarted(info: TurnStartedInfo): void;
   /** LHC thread ref recorded for a t3 thread, once its first event landed. */
   threadRef(t3ThreadId: string): { threadId: string; registryPath: string } | undefined;
+  /** Durable lineage lookup, including threads whose in-memory capture state was evicted. */
+  lookupThread(t3ThreadId: string): { threadId: string; registryPath: string } | undefined;
+  /** Durable lineage listing for the control surface. */
+  listCapturedThreads(): Array<{
+    t3ThreadId: string;
+    lhcThreadId: string;
+    providerKind: string;
+    createdAt: string;
+  }>;
   stats(): CaptureServiceStats;
   /** Register a cleanup callback run once during stop() (e.g. observer disposer). */
   onStop(hook: () => void): void;
@@ -174,6 +183,8 @@ function disabledService(): CaptureService {
     handleEvent: () => {},
     noteTurnStarted: () => {},
     threadRef: () => undefined,
+    lookupThread: () => undefined,
+    listCapturedThreads: () => [],
     stats: () => ({
       enabled: false,
       mode: "disabled",
@@ -471,6 +482,22 @@ export function startCaptureService(options: CaptureServiceOptions = {}): Captur
 
     threadRef(t3ThreadId: string): { threadId: string; registryPath: string } | undefined {
       return threadStates.get(t3ThreadId)?.ref ?? undefined;
+    },
+
+    lookupThread(t3ThreadId: string): { threadId: string; registryPath: string } | undefined {
+      const hotRef = threadStates.get(t3ThreadId)?.ref ?? undefined;
+      if (hotRef !== undefined) return hotRef;
+      const row = lineage.lookup(t3ThreadId);
+      return row === undefined ? undefined : captureThreadRef(row.lhcThreadId, registry);
+    },
+
+    listCapturedThreads() {
+      return lineage.list().map((row) => ({
+        t3ThreadId: row.t3ThreadId,
+        lhcThreadId: row.lhcThreadId,
+        providerKind: row.providerKind,
+        createdAt: row.createdAt,
+      }));
     },
 
     stats(): CaptureServiceStats {

@@ -190,3 +190,27 @@ launch/completion time. Newest entries at the bottom. Format:
   past the gate — orchestrator process note: re-run vp check before every commit, and
   delegate even trivial fixes.
 - next: Slice 2.2 — swap orchestration + endpoints (GPT-5.5 high), the Phase 2 core.
+
+## 2026-07-07 — Slice 2.2: Claude swap orchestration + control endpoints done
+
+- status: done
+- who: GPT-5.5 high (run -3ed3f6, 12.9m; revision -620258, 7.2m), verified Fable high
+  (run -7a93da, 10.4m: REVISE — 2 findings + polish, all fixed → converged; orchestrator
+  ran full gates: lhc-host 59 passed, server suites 97 passed, typecheck+check green)
+- what: packages/lhc-host/src/swap/claude.ts — full flow: lineage resolve → busy check +
+  per-thread swap lock → LHC compact/prune on capture's SDK → post-op view →
+  stopSession quiesce → writeRebuiltRollout (HOME from continuationKey for explicit
+  homes; NEW ClaudeSwapHome.ts aligns default-home with process.env.HOME + realpath) →
+  cursor flip LAST via ProviderSessionDirectory.upsert {threadId, resume, turnCount}
+  (merge semantics confirmed; uuid validated both ends) → runtime-note receipt.
+  Window B contested-flip guard: pre-flip active-session abort + post-flip cursor
+  re-read with retry-once-when-idle; contested = structured 409 flip_contested,
+  NEVER a lying success receipt. Window A documented (interrupted turn survives in LHC
+  record, drops from resumed context — accepted v1). HTTP: GET /lhc/status,
+  GET /lhc/threads/:id, POST /lhc/threads/:id/{compact,prune} behind the same
+  authenticateRawRouteWithScope as neighboring routes; 404/409/503/500+stepReached.
+- open risks for 2.4 (from verifier): server-wiring path is statically verified only —
+  2.4 is its first real execution; watch for missing_source_rollout and first-turn
+  "No conversation found" as the silent-swap tells; don't send turns mid-swap.
+- next: Slice 2.4 — live acceptance run (compact a real >100k thread, verify resume onto
+  compacted context + codename recall + auto-compact suppression live proof).

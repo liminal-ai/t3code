@@ -18,6 +18,14 @@
     "./flags": {
       "types": "./src/flags.ts",
       "import": "./src/flags.ts"
+    },
+    "./swap": {
+      "types": "./src/swap/claude.ts",
+      "import": "./src/swap/claude.ts"
+    },
+    "./http": {
+      "types": "./src/http.ts",
+      "import": "./src/http.ts"
     }
   },
   "scripts": {

@@ -1,7 +1,24 @@
-import { EnvironmentHttpApi } from "@t3tools/contracts";
+import {
+  AuthOrchestrationOperateScope,
+  AuthOrchestrationReadScope,
+  EnvironmentHttpApi,
+  ProviderDriverKind,
+  ProviderInstanceId,
+  type RuntimeMode,
+  ThreadId,
+} from "@t3tools/contracts";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { FetchHttpClient, HttpRouter, HttpServer } from "effect/unstable/http";
+import * as Option from "effect/Option";
+import * as Path from "effect/Path";
+import {
+  FetchHttpClient,
+  HttpRouter,
+  HttpServer,
+  HttpServerRequest,
+  HttpServerResponse,
+} from "effect/unstable/http";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import * as ServerConfig from "./config.ts";
@@ -11,6 +28,7 @@ import {
   serverEnvironmentHttpApiLayer,
   staticAndDevRouteLayer,
   browserApiCorsLayer,
+  authenticateRawRouteWithScope,
 } from "./http.ts";
 import { fixPath } from "./os-jank.ts";
 import { websocketRpcRouteLayer } from "./ws.ts";
@@ -27,7 +45,16 @@ import {
   registerTurnStartedObserver,
 } from "./provider/Layers/ProviderService.ts";
 import * as ProviderServiceApi from "./provider/Services/ProviderService.ts";
-import { makeLhcCaptureLayer } from "@t3tools/lhc-host/server-layer";
+import * as ProviderSessionDirectoryApi from "./provider/Services/ProviderSessionDirectory.ts";
+import { deriveClaudeSwapHomePath } from "./provider/Drivers/ClaudeSwapHome.ts";
+import { LhcCaptureService, makeLhcCaptureLayer } from "@t3tools/lhc-host/server-layer";
+import {
+  createClaudeSwapController,
+  persistedCwdFromBindingOrSession,
+  type ClaudeActiveSession,
+  type ClaudeProviderBinding,
+} from "@t3tools/lhc-host/swap";
+import { handleLhcHttpRequest } from "@t3tools/lhc-host/http";
 import { ProviderSessionReaperLive } from "./provider/Layers/ProviderSessionReaper.ts";
 import * as OpenCodeRuntime from "./provider/opencodeRuntime.ts";
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
@@ -103,6 +130,104 @@ import { disableTailscaleServe, ensureTailscaleServe } from "@t3tools/tailscale"
 // already closes the websocket gracefully. Do not add an artificial drain before
 // those finalizers get a chance to run.
 const HTTP_PREEMPTIVE_SHUTDOWN_GRACE_MS = 0;
+function makeLhcRouteLayer(method: "GET" | "POST", path: string) {
+  return HttpRouter.add(
+    method,
+    path as Parameters<typeof HttpRouter.add>[1],
+    Effect.gen(function* () {
+      yield* authenticateRawRouteWithScope(
+        method === "GET" ? AuthOrchestrationReadScope : AuthOrchestrationOperateScope,
+      );
+
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const url = HttpServerRequest.toURL(request);
+      if (Option.isNone(url)) {
+        return HttpServerResponse.jsonUnsafe(
+          { ok: false, error: { code: "bad_request", message: "Invalid request URL." } },
+          { status: 400 },
+        );
+      }
+
+      const capture = yield* LhcCaptureService;
+      const providerService = yield* ProviderServiceApi.ProviderService;
+      const directory = yield* ProviderSessionDirectoryApi.ProviderSessionDirectory;
+      const pathService = yield* Path.Path;
+      const runtimeContext = yield* Effect.context<never>();
+      const runPromise = Effect.runPromiseWith(runtimeContext);
+
+      const controller = createClaudeSwapController({
+        capture,
+        provider: {
+          listSessions: async () =>
+            runPromise(providerService.listSessions()) as Promise<readonly ClaudeActiveSession[]>,
+          stopSession: async (threadId) =>
+            runPromise(providerService.stopSession({ threadId: ThreadId.make(threadId) })),
+          readBinding: async (threadId) => {
+            const option = await runPromise(directory.getBinding(ThreadId.make(threadId)));
+            if (Option.isNone(option)) return undefined;
+            return option.value as ClaudeProviderBinding;
+          },
+          writeResumeCursor: async ({ threadId, binding, resumeCursor }) => {
+            const lastRuntimeEventAt = DateTime.formatIso(await runPromise(DateTime.now));
+            const upsertInput = {
+              threadId: ThreadId.make(threadId),
+              provider: ProviderDriverKind.make(binding.provider),
+              ...(binding.providerInstanceId !== undefined
+                ? { providerInstanceId: ProviderInstanceId.make(binding.providerInstanceId) }
+                : {}),
+              ...(binding.runtimeMode !== undefined
+                ? { runtimeMode: binding.runtimeMode as RuntimeMode }
+                : {}),
+              resumeCursor,
+              runtimePayload: {
+                lastRuntimeEvent: "lhc.claude-swap.cursor-flip",
+                lastRuntimeEventAt,
+              },
+            };
+            await runPromise(directory.upsert(upsertInput));
+          },
+          resolvePaths: async ({ binding, activeSession }) => {
+            if (binding.providerInstanceId === undefined) {
+              throw new Error("Provider binding is missing providerInstanceId.");
+            }
+            const info = await runPromise(
+              providerService.getInstanceInfo(ProviderInstanceId.make(binding.providerInstanceId)),
+            );
+            const claudeHomePath = await deriveClaudeSwapHomePath({
+              continuationKey: info.continuationIdentity.continuationKey,
+            });
+            const cwd = persistedCwdFromBindingOrSession({ binding, activeSession });
+            if (cwd === undefined) {
+              throw new Error("Claude thread has no persisted cwd.");
+            }
+            return {
+              cwd,
+              claudeHomePath,
+              claudeProjectsDir: pathService.join(claudeHomePath, ".claude", "projects"),
+            };
+          },
+        },
+      });
+
+      const body =
+        method === "POST" ? yield* request.json.pipe(Effect.orElseSucceed(() => ({}))) : undefined;
+      const response = yield* Effect.promise(() =>
+        handleLhcHttpRequest(controller, {
+          method,
+          pathname: url.value.pathname,
+          body,
+        }),
+      );
+      return HttpServerResponse.jsonUnsafe(response.body, { status: response.status });
+    }),
+  );
+}
+
+const lhcHttpRouteLayer = Layer.mergeAll(
+  makeLhcRouteLayer("GET", "/lhc/status"),
+  makeLhcRouteLayer("GET", "/lhc/threads/*"),
+  makeLhcRouteLayer("POST", "/lhc/threads/*"),
+);
 
 const PtyAdapterLive = Layer.unwrap(
   Effect.gen(function* () {
@@ -488,7 +613,7 @@ export const makeServerLayer = Layer.unwrap(
     );
 
     const serverApplicationLayer = Layer.mergeAll(
-      HttpRouter.serve(makeRoutesLayer, {
+      HttpRouter.serve(Layer.mergeAll(makeRoutesLayer, lhcHttpRouteLayer), {
         disableLogger: !config.logWebSocketEvents,
       }),
       httpListeningLayer,
