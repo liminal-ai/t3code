@@ -132,3 +132,22 @@ launch/completion time. Newest entries at the bottom. Format:
   eventId-key stability bounded to re-tails of the persisted stream).
 - next: Slice 1.2 — capture service + lineage + server bootstrap wiring (Fable codes,
   GPT-5.5 verifies). 1.2a (inference lane) already landed.
+
+## 2026-07-07 — Slice 1.2: capture service + lineage + server wiring done
+
+- status: done
+- who: Fable high (run -e532b7, 26.3m; revision -c2afc5, 9.8m), verified GPT-5.5 high
+  (run -981244: REVISE, 7 findings, all fixed → converged; orchestrator ran the
+  sandbox-blocked gates: lhc-host 36 passed, ProviderService 28/28, typecheck+check green)
+- what: `packages/lhc-host/src/` — paths/config (~/.t3code-lhc, T3CODE_LHC_HOME/
+  \_DISABLE/\_NO_INFERENCE), lineage (t3 ThreadId → LHC thread, file-then-row, race
+  converges), capture service (one background SDK; subscribes ProviderService.streamEvents
+  — the server's reconciled fan-in, so hot-added instances covered; per-thread unbounded
+  FIFO with 10k watermark warning + lazy idle eviction; fail-soft intake; stop() fully
+  capped at 30s with child-kill in finally), server layer (subscription attached via
+  Stream.toPull before service yields). Server diff: ProviderService.ts +~40 (turn-started
+  observer hook w/ disposer + forwarding-fiber catchCause hardening), server.ts +24,
+  package.json +1 dep. Verifier confirmed fan-in fidelity: unbounded PubSub, no
+  trimming/suppression — only providerInstanceId canonicalization.
+- next: Slice 1.3 — live capture validation on this Mac (orchestrator-driven): boot dev
+  server, real Claude+Codex sessions via a WS driver, inspect checks, mid-session restart.

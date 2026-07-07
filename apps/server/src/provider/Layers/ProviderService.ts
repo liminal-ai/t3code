@@ -58,6 +58,39 @@ import * as McpSessionRegistry from "../../mcp/McpSessionRegistry.ts";
 const isModelSelection = Schema.is(ModelSelection);
 
 /**
+ * Observation-only hook (fork-local, lhc-host capture): invoked after an
+ * adapter accepts a turn, with the routed thread, the provider-assigned turn
+ * id, and the prompt text. Deliberately typed in plain strings so no lhc-host
+ * types enter provider code; failures in the observer never affect the turn
+ * path.
+ */
+export type TurnStartedObserver = (info: {
+  readonly threadId: string;
+  readonly turnId: string;
+  readonly prompt: string;
+  readonly provider: string;
+}) => void;
+let turnStartedObserver: TurnStartedObserver | undefined;
+/**
+ * Register the (last-wins) observer and return a disposer that unregisters it
+ * — capture calls the disposer on stop so a torn-down service's closure does
+ * not linger.
+ */
+export function registerTurnStartedObserver(observer: TurnStartedObserver): () => void {
+  turnStartedObserver = observer;
+  return () => {
+    if (turnStartedObserver === observer) turnStartedObserver = undefined;
+  };
+}
+const notifyTurnStarted: TurnStartedObserver = (info) => {
+  try {
+    turnStartedObserver?.(info);
+  } catch {
+    // observation-only: capture must never affect the turn path
+  }
+};
+
+/**
  * Hook for tests that want to override the canonical event logger pulled
  * from `ProviderEventLoggers`. Production wiring leaves this undefined and
  * reads the logger off the tag.
@@ -338,6 +371,18 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
               provider: adapter.provider,
             },
             event,
+          ).pipe(
+            // Drop a poisoned event (e.g. instance/provider mismatch throw in
+            // canonicalization) without killing this adapter's forwarding
+            // fiber — otherwise every downstream consumer, ours and the
+            // server's own, loses this adapter's feed on one bad event.
+            Effect.catchCause((cause) =>
+              Effect.logWarning("provider.runtime-event.forward-failed", {
+                instanceId: id,
+                provider: adapter.provider,
+                cause,
+              }),
+            ),
           ),
         ).pipe(Effect.forkScoped);
       }
@@ -680,6 +725,12 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         ...(input.modelSelection?.model ? { "provider.model": input.modelSelection.model } : {}),
       });
       const turn = yield* routed.adapter.sendTurn(input);
+      notifyTurnStarted({
+        threadId: input.threadId,
+        turnId: turn.turnId,
+        prompt: input.input ?? "",
+        provider: routed.adapter.provider,
+      });
       yield* directory.upsert({
         threadId: input.threadId,
         provider: routed.adapter.provider,

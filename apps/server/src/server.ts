@@ -22,7 +22,12 @@ import { ProviderSessionDirectoryLive } from "./provider/Layers/ProviderSessionD
 import * as ProviderSessionRuntime from "./persistence/ProviderSessionRuntime.ts";
 import { ProviderAdapterRegistryLive } from "./provider/Layers/ProviderAdapterRegistry.ts";
 import * as ProviderEventLoggers from "./provider/Layers/ProviderEventLoggers.ts";
-import { ProviderServiceLive } from "./provider/Layers/ProviderService.ts";
+import {
+  ProviderServiceLive,
+  registerTurnStartedObserver,
+} from "./provider/Layers/ProviderService.ts";
+import * as ProviderServiceApi from "./provider/Services/ProviderService.ts";
+import { makeLhcCaptureLayer } from "@t3tools/lhc-host/server-layer";
 import { ProviderSessionReaperLive } from "./provider/Layers/ProviderSessionReaper.ts";
 import * as OpenCodeRuntime from "./provider/opencodeRuntime.ts";
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
@@ -279,10 +284,25 @@ const CloudManagedEndpointRuntimeLive = Layer.mergeAll(
   ),
 );
 
-const ProviderRuntimeLayerLive = ProviderSessionReaperLive.pipe(
-  Layer.provideMerge(ProviderLayerLive),
-  Layer.provideMerge(OrchestrationLayerLive),
+// LHC capture (fork-local): records every Claude/Codex thread into a durable
+// LHC thread as it runs. Observes the unified runtime event stream and the
+// sendTurn choke point; the whole integration is this composition plus the
+// named `registerTurnStartedObserver` hook in ProviderService. Kill switch:
+// T3CODE_LHC_DISABLE=1.
+const LhcCaptureLayerLive = makeLhcCaptureLayer(
+  Effect.gen(function* () {
+    const providerService = yield* ProviderServiceApi.ProviderService;
+    return {
+      streamEvents: providerService.streamEvents,
+      registerTurnStarted: registerTurnStartedObserver,
+    };
+  }),
 );
+
+const ProviderRuntimeLayerLive = Layer.mergeAll(
+  ProviderSessionReaperLive,
+  LhcCaptureLayerLive,
+).pipe(Layer.provideMerge(ProviderLayerLive), Layer.provideMerge(OrchestrationLayerLive));
 
 const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
   // Core Services
