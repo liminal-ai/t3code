@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off globalTimers:off
+// @effect-diagnostics nodeBuiltinImport:off globalTimers:off globalDate:off
 import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
@@ -91,7 +91,15 @@ function makeFakeSdk(calls: string[], overrides: Partial<Lhc> = {}): Lhc {
           ],
         });
       },
-      status: async () => ok({ visibility: { boundaryPosition: 0, zoneTokens: 0 } }),
+      status: async () =>
+        ok({
+          tailTokens: 0,
+          threshold: 160_000,
+          compactRecommended: false,
+          derivation: { pending: 0, retrying: 0, failed: 0, blocked: 0 },
+          view: null,
+          visibility: { boundaryPosition: 0, zoneTokens: 0, maxTokens: 200_000 },
+        }),
     },
     intakeStream: {
       listEvents: async () => ok([]),
@@ -220,6 +228,14 @@ function makeProvider(
       cursor = next;
     },
   };
+}
+
+async function waitUntil(predicate: () => boolean, timeoutMs = 5_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error("waitUntil timed out");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
 }
 
 let root: string;
@@ -447,25 +463,53 @@ describe("Claude swap orchestration", () => {
     expect(receipt.cursor.resume).toBe(receipt.newSessionId);
   });
 
-  it("rejects same-thread concurrent swaps but lets different threads run concurrently", async () => {
+  it("returns swap_in_progress while the first swap is parked at quiesce", async () => {
+    const calls: string[] = [];
+    let releaseQuiesce: (() => void) | undefined;
+    const quiesceGate = new Promise<void>((resolve) => {
+      releaseQuiesce = resolve;
+    });
+    const { provider } = makeProvider(root, calls, {
+      stopSession: async () => {
+        calls.push("quiesce");
+        await quiesceGate;
+      },
+    });
+    const controller = createClaudeSwapController({
+      capture: makeCapture(makeFakeSdk(calls)),
+      provider,
+    });
+
+    const first = controller.compactThread("t3-1");
+    await waitUntil(() => calls.includes("quiesce"));
+
+    await expect(controller.compactThread("t3-1")).rejects.toMatchObject({
+      code: "swap_in_progress",
+      stepReached: "busy-check",
+      retriable: true,
+    });
+
+    releaseQuiesce?.();
+    await expect(first).resolves.toMatchObject({ op: "compact", t3ThreadId: "t3-1" });
+  });
+
+  it("lets different threads run concurrently while one swap is parked", async () => {
     const calls: string[] = [];
     let release: (() => void) | undefined;
     const wait = new Promise<void>((resolve) => {
       release = resolve;
     });
     const { provider } = makeProvider(root, calls, {
-      listSessions: async () => {
+      stopSession: async () => {
+        calls.push("quiesce");
         await wait;
-        return [];
       },
     });
     const capture = makeCapture(makeFakeSdk(calls));
     const controller = createClaudeSwapController({ capture, provider });
 
     const first = controller.compactThread("t3-1");
-    await expect(controller.compactThread("t3-1")).rejects.toMatchObject({
-      code: "swap_in_progress",
-    });
+    await waitUntil(() => calls.includes("quiesce"));
     const other = controller.compactThread("t3-2").catch((cause) => cause);
     release?.();
     await first;
@@ -527,6 +571,12 @@ describe("Claude swap with real LHC SDK", () => {
       ],
     };
     const controller = createClaudeSwapController({ capture, provider });
+
+    const preInspect = await controller.inspectThread("t3-1");
+    expect(preInspect.viewStatus.tailTokens).toBeGreaterThan(0);
+    expect(typeof preInspect.viewStatus.compactRecommended).toBe("boolean");
+    expect(preInspect.tailTokens).toBe(preInspect.viewStatus.tailTokens);
+    expect(preInspect.compactRecommended).toBe(preInspect.viewStatus.compactRecommended);
 
     const receipt = await controller.compactThread("t3-1", {
       params: { lowerBound: 120, percentages: { full: 25, smooth: 25, detailed: 25, brief: 25 } },

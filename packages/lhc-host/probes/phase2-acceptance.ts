@@ -457,7 +457,7 @@ async function main(): Promise<void> {
         const convo = rolloutConversation(rebuiltPath);
         const recallLine = convo
           .filter((c) => c.role === "assistant")
-          .reverse()
+          .toReversed()
           .find((c) => /codename/i.test(c.text));
         journal.rebuiltFileAfterResume = {
           path: rebuiltPath,

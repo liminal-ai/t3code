@@ -239,3 +239,20 @@ launch/completion time. Newest entries at the bottom. Format:
   deterministic swap_in_progress coverage.
 - next: Phase 3 (endpoint consolidation + operations doc — small), then Phase 4 (Codex:
   4.0 synthetic thread/resume probe first).
+
+## 2026-07-07 — Slice 3.1: endpoints + hardening + operations doc — PHASE 3 COMPLETE
+
+- status: done
+- who: Composer (run -e516a8, 2.9m; doc revision via resume), verified GPT-5.5 high
+  (run -fa76c9: code/tests ACCEPT; REVISE on 4 ops-doc accuracy items → fixed →
+  converged; orchestrator ran gates: 60 passed, typecheck+check green)
+- what: GET /lhc/threads/:id now surfaces tailTokens + compactRecommended top-level;
+  /lhc/status carries per-thread pending/pendingHigh (hot-state semantics documented).
+  Deterministic swap_in_progress test (gated quiesce, racing second request → 409,
+  release → first completes). Suppression integration assert confirmed already covered
+  (ClaudeAdapter.test.ts:688-763). viewStatus assertions added to swap integration test.
+  docs/lhc/operations.md: state layout, env flags (incl. T3CODE_LHC_CLAUDE_BIN), boot
+  recipe, curl book w/ full error table, troubleshooting (silent-swap tells, drain
+  issues), known limits — verifier-audited line-by-line against code.
+- next: Phase 4 — Slice 4.0 (codex synthetic thread/resume probe, the last structural
+  unknown), then 4.1 rebuilder + 4.2 swap orchestration + 4.3 acceptance.

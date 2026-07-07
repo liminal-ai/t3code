@@ -147,6 +147,10 @@ export interface LhcStatusThreadSummary {
   eventCount: number;
   turnCount: number;
   lastActivityAt: string | null;
+  /** Capture intake queue depth for this thread (currently queued + in-flight). */
+  pending: number;
+  /** Max pending depth ever observed for this thread. */
+  pendingHigh: number;
 }
 
 export interface LhcStatusReceipt {
@@ -160,6 +164,10 @@ export interface LhcThreadInspectReceipt {
   overview: InspectOverview;
   health: HealthReport;
   viewStatus: ViewStatus;
+  /** Operator shortcut — mirrors `viewStatus.tailTokens`. */
+  tailTokens: number;
+  /** Operator shortcut — mirrors `viewStatus.compactRecommended`. */
+  compactRecommended: boolean;
 }
 
 export interface ClaudeSwapReceipt {
@@ -250,7 +258,7 @@ function summaryFromOverview(
   row: ReturnType<CaptureService["listCapturedThreads"]>[number],
   overview: InspectOverview,
   events: { recordedAt: string }[],
-): LhcStatusThreadSummary {
+): Omit<LhcStatusThreadSummary, "pending" | "pendingHigh"> {
   return {
     t3ThreadId: row.t3ThreadId,
     lhcThreadId: row.lhcThreadId,
@@ -354,19 +362,28 @@ export function createClaudeSwapController(
   const locks = new Set<string>();
 
   async function status(): Promise<LhcStatusReceipt> {
+    const captureStats = capture.stats();
     const sdk = capture.sdk;
     if (!capture.enabled || sdk === undefined) {
-      return { capture: capture.stats(), threads: [] };
+      return { capture: captureStats, threads: [] };
     }
+    const captureByThread = new Map(
+      captureStats.threads.map((thread) => [thread.t3ThreadId, thread] as const),
+    );
     const threads: LhcStatusThreadSummary[] = [];
     for (const row of capture.listCapturedThreads()) {
       const ref = capture.lookupThread(row.t3ThreadId);
       if (ref === undefined) continue;
       const overview = assertOk(await sdk.inspect.overview(ref), "receipt", "swap_failed");
       const events = assertOk(await sdk.intakeStream.listEvents(ref), "receipt", "swap_failed");
-      threads.push(summaryFromOverview(row, overview, events));
+      const captureThread = captureByThread.get(row.t3ThreadId);
+      threads.push({
+        ...summaryFromOverview(row, overview, events),
+        pending: captureThread?.pending ?? 0,
+        pendingHigh: captureThread?.pendingHigh ?? 0,
+      });
     }
-    return { capture: capture.stats(), threads };
+    return { capture: captureStats, threads };
   }
 
   async function inspectThread(t3ThreadId: string): Promise<LhcThreadInspectReceipt> {
@@ -375,7 +392,15 @@ export function createClaudeSwapController(
     const overview = assertOk(await sdk.inspect.overview(ref), "receipt", "swap_failed");
     const health = assertOk(await sdk.inspect.health(ref), "receipt", "swap_failed");
     const viewStatus = assertOk(await sdk.threadView.status(ref), "receipt", "swap_failed");
-    return { t3ThreadId, lhcThreadId: ref.threadId, overview, health, viewStatus };
+    return {
+      t3ThreadId,
+      lhcThreadId: ref.threadId,
+      overview,
+      health,
+      viewStatus,
+      tailTokens: viewStatus.tailTokens,
+      compactRecommended: viewStatus.compactRecommended,
+    };
   }
 
   async function withStep<T>(
