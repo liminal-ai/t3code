@@ -130,21 +130,50 @@ serving seam.
 
 ## Delegation model
 
-Lee provides subagent CLI tools (Claude Code, Codex, Cursor); the orchestrator (this session's
-successor) plans, briefs, launches, and verifies — it does not generally code or verify by hand.
-Model-to-slice assignment happens when tools are granted; every slice below carries a difficulty
-tier to make that mapping mechanical:
+Tools: `cursor-subagent` (Composer 2.5), `codex-subagent` (gpt-5.5, reasoning high — machine
+default), `claude-subagent` (Claude Code, Fable 5, effort high — machine default). The
+orchestrator plans, briefs, launches, and facilitates communication between coder and verifier
+until they converge — it does not generally code or verify by hand. **Coders code, verifiers
+verify** (Lee's ruling, 2026-07-07):
 
-- **easy / easy-moderate** — mechanical ports, scaffolds, config: default to the fast lane
-  (Cursor/Composer-class).
-- **hard** — semantic cores, concurrency, swap orchestration: strongest available lane
-  (GPT-5.5-high-class or a forked orchestrator clone), with a second model verifying.
-- **Verification** on every substantive slice: a different model than the implementer, briefed
-  with acceptance criteria, not the implementation.
+- **Easy / moderate coding** → Composer 2.5 (`cursor-subagent`). Alternative coder: Fable 5 at
+  medium effort (`claude-subagent`) — e.g. where repo-idiom familiarity (Effect) matters.
+  GPT-5.5 is deliberately NOT used on easy/moderate coding: it over-guards (e.g. writes
+  tombstone tests verifying removed capabilities stay removed).
+- **Difficult coding** → GPT-5.5 high (`codex-subagent`).
+- **Verification** defaults to GPT-5.5 high — except when GPT-5.5 was the coder, then Fable 5
+  high verifies. Cross-perspective rule: Composer codes → GPT-5.5 verifies (never
+  Claude-family: Composer is largely a distillation of old Claude usage); GPT-5.5 codes →
+  Fable verifies.
+- Verifiers are briefed with acceptance criteria, not the implementation. Findings route back
+  to the coder (resume its session via `--resume`) until convergence.
 
-Every subagent launch, outcome, and next action gets logged in `impl-log.md` at launch/completion
-time. Repo gate: `vp check` and `vp run typecheck` must pass before a slice is accepted
-(AGENTS.md rule).
+### Slice assignments
+
+| Slice | Coder | Verifier |
+| --- | --- | --- |
+| 0.1 scaffold | Composer | GPT-5.5 high (light diff audit) + orchestrator gates |
+| 0.2 fidelity probe | GPT-5.5 high (investigation) | Fable high (findings audit) |
+| 0.3 Claude swap probe | Fable high (investigation) | GPT-5.5 high |
+| 0.4 concurrency harness | GPT-5.5 high | Fable high |
+| 1.1 mapper + accumulator | GPT-5.5 high | Fable high |
+| 1.2 capture wiring | Fable medium (Effect-heavy) | GPT-5.5 high |
+| 1.3 live validation | orchestrator-driven | — |
+| 2.1 rebuilder port | Composer | GPT-5.5 high (diff-audit vs cc-lhc) |
+| 2.2 swap orchestration | GPT-5.5 high | Fable high |
+| 2.3 auto-compact suppression | Composer | GPT-5.5 high |
+| 2.4 acceptance run | orchestrator-driven | — |
+| 3.1 endpoints | Composer | GPT-5.5 high |
+| 4.0 codex swap probe | GPT-5.5 high | Fable high |
+| 4.1 codex rebuilder | consume: Composer / absorb: GPT-5.5 high | the other family |
+| 4.2 codex swap orchestration | GPT-5.5 high | Fable high |
+| 4.3 acceptance run | orchestrator-driven | — |
+
+Mechanics: briefs via `--prompt-file`; `cd` into the fork before every run; parallel slices in
+separate git worktrees (all tools mutate cwd with full autonomy); envelope `ok` is never
+"done" — verification is a separate run plus orchestrator gates. Every launch, outcome, and
+ruling gets logged in `impl-log.md` at launch/completion time. Repo gate: `vp check` and
+`vp run typecheck` must pass before a slice is accepted (AGENTS.md rule).
 
 ## Out of scope (this pass)
 
