@@ -1,0 +1,22 @@
+{
+  "name": "@t3tools/lhc-host",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./smoke": {
+      "types": "./src/smoke.ts",
+      "import": "./src/smoke.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "lhc": "link:../../../../pi-long-horizon/liminal-context/packages/lhc"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

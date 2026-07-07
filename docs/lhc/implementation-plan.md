@@ -54,7 +54,7 @@ serving seam.
   (`apps/server/src/provider/ProviderDriver.ts`, `provider/Services/ProviderAdapter.ts`). Each
   adapter emits a **normalized event stream** (`streamEvents: Stream<ProviderRuntimeEvent>`) with
   a closed vocabulary (`packages/contracts/src/providerRuntime.ts`): `turn.started/completed/
-  aborted`, `item.started/updated/completed` with canonical item types (`user_message`,
+aborted`, `item.started/updated/completed` with canonical item types (`user_message`,
   `assistant_message`, `reasoning`, tool lifecycle types), `content.delta`, `model.rerouted`, etc.
   This is the intake tap: **one mapper for both providers**, no rollout tailing needed for capture.
 - **Claude** (`provider/Layers/ClaudeAdapter.ts`, ~3.9k lines): wraps
@@ -110,23 +110,23 @@ serving seam.
 
 ## Standing decisions
 
-| Decision | Ruling | Status |
-| --- | --- | --- |
-| Scope | Claude Code + Codex only; no LHC support for Cursor/Grok/OpenCode/Copilot in this pass | ratified (Lee, 2026-07-07) |
-| Priorities | 1) Claude end-to-end, 2) Codex | ratified |
-| Base strategy | Personal fork, pinned at `6e42231cb`; opportunistic version hops; never continuous rebase | ratified |
-| Package shape | One new package `packages/lhc-host` in the fork + minimal wiring diffs in `apps/server` (target: ≤ ~4 touch points) so hops stay cheap | ratified pattern |
-| SDK consumption | Link `lhc` from `~/code/pi-long-horizon/liminal-context/packages/lhc` (file/link dep). Clean up later | ratified (Lee) |
-| State layout | Everything under `~/.t3code-lhc/` (override `T3CODE_LHC_HOME`): `registry.sqlite`, `t3code-lhc.sqlite` (lineage), `threads/<uuid>.sqlite`. **Never** `~/.lhc` — hosts own their state dirs | ratified (Lee) |
-| Inference lane | Copy cc-lhc's `claude -p` subprocess provider (`inference/claude-cli.ts` + assignments, Sonnet-no-thinking) verbatim; `--no-inference`-style escape hatch (`T3CODE_LHC_NO_INFERENCE=1`) | ratified (Lee) |
-| Intake tap | Normalized `ProviderRuntimeEvent` stream, `item.completed`-based (never deltas). If a payload is lossy: prefer patching the adapter payload in-fork; `raw` field and rollout tailing are fallbacks | proposed; Slice 0.2 decides |
-| Capture ordering | Per-thread serialized intake worker; one t3 thread ↔ one LHC thread ↔ one SQLite file. No cross-thread writes to one file | ratified by design |
-| SDK instance | One long-lived background-mode `initLhc` instance in the server process | proposed |
-| Control surface | Bare HTTP endpoints on the existing server (status/compact/prune/inspect), curl-driven; no web UI this pass | ratified (Lee) |
-| Rollback/fork in t3 UI | Out of scope: not LHC-aware. Using t3 rollback on an LHC thread diverges the record; documented, tolerated (runtime-note scar at most) | ratified as accepted risk |
-| Idempotency keys | `t3lhc:<threadId>:<eventId-or-itemId>:<kind>`; harness literal `"t3"` | proposed |
-| Turn boundaries | From `turn.started`/`turn.completed`/`turn.aborted` events; aborted turns close with a `runtime_note` | proposed |
-| v2 rebuild | Explicit non-goal now; revisit when orchestration-v2 merges to upstream main | ratified |
+| Decision               | Ruling                                                                                                                                                                                             | Status                      |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| Scope                  | Claude Code + Codex only; no LHC support for Cursor/Grok/OpenCode/Copilot in this pass                                                                                                             | ratified (Lee, 2026-07-07)  |
+| Priorities             | 1) Claude end-to-end, 2) Codex                                                                                                                                                                     | ratified                    |
+| Base strategy          | Personal fork, pinned at `6e42231cb`; opportunistic version hops; never continuous rebase                                                                                                          | ratified                    |
+| Package shape          | One new package `packages/lhc-host` in the fork + minimal wiring diffs in `apps/server` (target: ≤ ~4 touch points) so hops stay cheap                                                             | ratified pattern            |
+| SDK consumption        | Link `lhc` from `~/code/pi-long-horizon/liminal-context/packages/lhc` (file/link dep). Clean up later                                                                                              | ratified (Lee)              |
+| State layout           | Everything under `~/.t3code-lhc/` (override `T3CODE_LHC_HOME`): `registry.sqlite`, `t3code-lhc.sqlite` (lineage), `threads/<uuid>.sqlite`. **Never** `~/.lhc` — hosts own their state dirs         | ratified (Lee)              |
+| Inference lane         | Copy cc-lhc's `claude -p` subprocess provider (`inference/claude-cli.ts` + assignments, Sonnet-no-thinking) verbatim; `--no-inference`-style escape hatch (`T3CODE_LHC_NO_INFERENCE=1`)            | ratified (Lee)              |
+| Intake tap             | Normalized `ProviderRuntimeEvent` stream, `item.completed`-based (never deltas). If a payload is lossy: prefer patching the adapter payload in-fork; `raw` field and rollout tailing are fallbacks | proposed; Slice 0.2 decides |
+| Capture ordering       | Per-thread serialized intake worker; one t3 thread ↔ one LHC thread ↔ one SQLite file. No cross-thread writes to one file                                                                          | ratified by design          |
+| SDK instance           | One long-lived background-mode `initLhc` instance in the server process                                                                                                                            | proposed                    |
+| Control surface        | Bare HTTP endpoints on the existing server (status/compact/prune/inspect), curl-driven; no web UI this pass                                                                                        | ratified (Lee)              |
+| Rollback/fork in t3 UI | Out of scope: not LHC-aware. Using t3 rollback on an LHC thread diverges the record; documented, tolerated (runtime-note scar at most)                                                             | ratified as accepted risk   |
+| Idempotency keys       | `t3lhc:<threadId>:<eventId-or-itemId>:<kind>`; harness literal `"t3"`                                                                                                                              | proposed                    |
+| Turn boundaries        | From `turn.started`/`turn.completed`/`turn.aborted` events; aborted turns close with a `runtime_note`                                                                                              | proposed                    |
+| v2 rebuild             | Explicit non-goal now; revisit when orchestration-v2 merges to upstream main                                                                                                                       | ratified                    |
 
 ## Delegation model
 
@@ -150,24 +150,24 @@ verify** (Lee's ruling, 2026-07-07):
 
 ### Slice assignments
 
-| Slice | Coder | Verifier |
-| --- | --- | --- |
-| 0.1 scaffold | Composer | GPT-5.5 high (light diff audit) + orchestrator gates |
-| 0.2 fidelity probe | GPT-5.5 high (investigation) | Fable high (findings audit) |
-| 0.3 Claude swap probe | Fable high (investigation) | GPT-5.5 high |
-| 0.4 concurrency harness | GPT-5.5 high | Fable high |
-| 1.1 mapper + accumulator | GPT-5.5 high | Fable high |
-| 1.2 capture wiring | Fable medium (Effect-heavy) | GPT-5.5 high |
-| 1.3 live validation | orchestrator-driven | — |
-| 2.1 rebuilder port | Composer | GPT-5.5 high (diff-audit vs cc-lhc) |
-| 2.2 swap orchestration | GPT-5.5 high | Fable high |
-| 2.3 auto-compact suppression | Composer | GPT-5.5 high |
-| 2.4 acceptance run | orchestrator-driven | — |
-| 3.1 endpoints | Composer | GPT-5.5 high |
-| 4.0 codex swap probe | GPT-5.5 high | Fable high |
-| 4.1 codex rebuilder | consume: Composer / absorb: GPT-5.5 high | the other family |
-| 4.2 codex swap orchestration | GPT-5.5 high | Fable high |
-| 4.3 acceptance run | orchestrator-driven | — |
+| Slice                        | Coder                                    | Verifier                                             |
+| ---------------------------- | ---------------------------------------- | ---------------------------------------------------- |
+| 0.1 scaffold                 | Composer                                 | GPT-5.5 high (light diff audit) + orchestrator gates |
+| 0.2 fidelity probe           | GPT-5.5 high (investigation)             | Fable high (findings audit)                          |
+| 0.3 Claude swap probe        | Fable high (investigation)               | GPT-5.5 high                                         |
+| 0.4 concurrency harness      | GPT-5.5 high                             | Fable high                                           |
+| 1.1 mapper + accumulator     | GPT-5.5 high                             | Fable high                                           |
+| 1.2 capture wiring           | Fable medium (Effect-heavy)              | GPT-5.5 high                                         |
+| 1.3 live validation          | orchestrator-driven                      | —                                                    |
+| 2.1 rebuilder port           | Composer                                 | GPT-5.5 high (diff-audit vs cc-lhc)                  |
+| 2.2 swap orchestration       | GPT-5.5 high                             | Fable high                                           |
+| 2.3 auto-compact suppression | Composer                                 | GPT-5.5 high                                         |
+| 2.4 acceptance run           | orchestrator-driven                      | —                                                    |
+| 3.1 endpoints                | Composer                                 | GPT-5.5 high                                         |
+| 4.0 codex swap probe         | GPT-5.5 high                             | Fable high                                           |
+| 4.1 codex rebuilder          | consume: Composer / absorb: GPT-5.5 high | the other family                                     |
+| 4.2 codex swap orchestration | GPT-5.5 high                             | Fable high                                           |
+| 4.3 acceptance run           | orchestrator-driven                      | —                                                    |
 
 Mechanics: briefs via `--prompt-file`; `cd` into the fork before every run; parallel slices in
 separate git worktrees (all tools mutate cwd with full autonomy); envelope `ok` is never
@@ -187,14 +187,14 @@ access changes; mobile; orchestration-v2 integration; publishing the SDK; multi-
 Milestone: the fork builds with the SDK linked in, and every load-bearing unknown has a written
 answer in `docs/lhc/findings/`.
 
-**Slice 0.1 — package scaffold + SDK link.** *(easy)*
+**Slice 0.1 — package scaffold + SDK link.** _(easy)_
 Create `packages/lhc-host` (name `@t3tools/lhc-host`) in the fork: `package.json`, `tsconfig`,
 vitest via `vp`, linked `lhc` dependency from liminal-context. Smoke test: `initLhc` in manual
 mode with deterministic callbacks creates a thread under a temp dir, intakes a fixture batch,
 reads it back via `messages.list`. Acceptance: `vp run typecheck` and `vp check` pass at repo
 root; smoke test green; no changes outside the new package.
 
-**Slice 0.2 — probe: event-stream fidelity.** *(moderate; findings doc is the deliverable)*
+**Slice 0.2 — probe: event-stream fidelity.** _(moderate; findings doc is the deliverable)_
 Run real Claude and Codex sessions through the dev server with the NDJSON provider-event logger
 on. Diff `item.completed` payloads against the provider rollout files (Claude: full tool output
 known present in rollouts; Codex: same). Answer per provider: does the normalized stream carry
@@ -204,7 +204,7 @@ last resort). Deliverable: `docs/lhc/findings/event-fidelity.md` + captured NDJS
 pairs checked into `packages/lhc-host/test/fixtures/`. Acceptance: an explicit mapper tap-point
 decision recorded per provider, evidence-cited.
 
-**Slice 0.3 — probe: Claude session restart from flipped cursor.** *(moderate)*
+**Slice 0.3 — probe: Claude session restart from flipped cursor.** _(moderate)_
 On a scratch thread: stop the active provider session, hand-edit the resume cursor to a rebuilt
 rollout file's session id (hand-build a minimal rebuilt file first — cc-lhc's rebuilder as a
 library or by hand), send a turn, confirm the Agent SDK session resumes on the rebuilt file and
@@ -213,7 +213,7 @@ the planted history reaches the model (codename-recall probe). Also observe inte
 step-by-step swap recipe (order of operations, failure behavior when the cursor points at a
 missing file).
 
-**Slice 0.4 — probe: multi-thread drain concurrency (bare SDK).** *(hard)*
+**Slice 0.4 — probe: multi-thread drain concurrency (bare SDK).** _(hard)_
 Test harness in `packages/lhc-host/test/`: one background-mode SDK instance, ~10 threads, concurrent
 intake at realistic rates + drains with (a) fake inference callbacks with induced latency, and (b) a
 short real `claude -p` smoke. Watch for cross-thread interference, drain starvation, event-loop
@@ -226,7 +226,7 @@ defects filed as blocking items before Phase 1 sign-off.
 Milestone: real Claude and Codex sessions run through the (dev) server are fully recorded into
 LHC threads — `inspect.overview`/`health` sane, restart-safe, derivations draining.
 
-**Slice 1.1 — mapper + turn accumulator (semantic core).** *(hard)*
+**Slice 1.1 — mapper + turn accumulator (semantic core).** _(hard)_
 `packages/lhc-host/src/intake/map.ts`: `ProviderRuntimeEvent` → ordered LHC intake events, per the
 Slice 0.2 tap-point decision. `item.completed(user_message)` → `user_prompt`; `reasoning` →
 `assistant_thinking`; `assistant_message` → `assistant_text`; tool lifecycle items → `tool_call`/
@@ -238,7 +238,7 @@ from the 0.2 captures covering every canonical item type, both providers, plus s
 (`collab_agent_tool_call`) and interrupt/abort cases. Acceptance: fixtures replayed twice produce
 zero duplicates; unknown-event fixture produces skip counts, not errors.
 
-**Slice 1.2 — capture service + lineage + inference lane wiring.** *(moderate-hard)*
+**Slice 1.2 — capture service + lineage + inference lane wiring.** _(moderate-hard)_
 `src/capture/`: subscribe to every registered provider instance's `adapter.streamEvents`
 (Claude/Codex instances only), route by `threadId` into per-thread serialized intake workers
 (`DrainableWorker` pattern), auto-create LHC threads on first sight of a t3 thread, lineage table
@@ -248,7 +248,7 @@ diff #1: instantiate the host service in server bootstrap; clean shutdown drains
 and awaits `drainSettled` (capped). Acceptance: unit tests with a scripted event stream; wiring
 diff confined to bootstrap; typecheck/check green.
 
-**Slice 1.3 — live capture validation.** *(moderate; verification-heavy)*
+**Slice 1.3 — live capture validation.** _(moderate; verification-heavy)_
 Run real sessions on both providers through the dev server: multi-turn, tool-heavy, one
 interrupted turn, one sub-agent task. Check `inspect.overview`/`health` per thread (counts sane,
 no failed intake, derivations landing). Kill and restart the server mid-session; confirm
@@ -260,14 +260,14 @@ appended to `impl-log.md`. Acceptance: written pass against a checklist of the a
 Milestone: on a long-running Claude thread, an operator hits a prune/compact endpoint and the
 next turn provably runs on the compacted context.
 
-**Slice 2.1 — Claude rollout rebuilder integration.** *(moderate)*
+**Slice 2.1 — Claude rollout rebuilder integration.** _(moderate)_
 Port cc-lhc `rollout/rebuild.ts` + `write-rebuilt.ts` (+ `sessions-index.ts` only if 0.3 showed
 the index matters to the Agent SDK) into `src/claude-swap/`, parameterized by the instance's
 resolved Claude HOME and cwd encoding. Unit tests against cc-lhc's fixture shapes. Acceptance:
 rebuilt file for a fixture thread view is byte-shape-valid per cc-lhc's tests, written fsync'd to
 a fresh session id path, original untouched.
 
-**Slice 2.2 — swap orchestration + bare trigger endpoints.** *(hard)*
+**Slice 2.2 — swap orchestration + bare trigger endpoints.** _(hard)_
 `src/swap/claude.ts` implementing the 0.3 recipe: turn-gate (refuse while the t3 thread has an
 open turn — read t3's own turn state), LHC `prune`/`compact`, rebuild, cursor flip through the
 `ProviderSessionRuntime` repo, `stopSession`, receipt. Failure-safe ordering: nothing mutates the
@@ -278,12 +278,12 @@ rebuild failure leaves everything running. Server wiring diff #2: bare HTTP endp
 Acceptance: on a live dev thread — compact via curl, next turn resumes on the rebuilt session
 (codename-recall + rollout file inspection), and a compact attempted mid-turn refuses cleanly.
 
-**Slice 2.3 — Claude native auto-compact suppression.** *(easy-moderate)*
+**Slice 2.3 — Claude native auto-compact suppression.** _(easy-moderate)_
 Confirm and implement the mechanism (Agent SDK option / settings / env) in the fork's session
 start path, flag-gated. Acceptance: a thread pushed past Claude's native compact threshold shows
 no `compact_boundary` in capture while suppression is on.
 
-**Slice 2.4 — end-to-end acceptance run.** *(moderate; verification slice)*
+**Slice 2.4 — end-to-end acceptance run.** _(moderate; verification slice)_
 One long dogfood thread on the Linux-box-style setup (server headless, browser remote): capture →
 grow past ~100k tokens → prune → compact → continue working. Verify: LHC `status` numbers move as
 expected; rebuilt context serves; UI history remains intact (projections untouched by swap);
@@ -292,9 +292,9 @@ receipts logged. Deliverable: written acceptance in `impl-log.md`; punch list fo
 ### Phase 3 — Control surface consolidation
 
 Milestone: the endpoints from 2.2 are complete, consistent, and documented — the operator surface
-for daily use. *(This phase is small by design; real UI is out of scope.)*
+for daily use. _(This phase is small by design; real UI is out of scope.)_
 
-**Slice 3.1 — endpoint completion + receipts.** *(easy-moderate)*
+**Slice 3.1 — endpoint completion + receipts.** _(easy-moderate)_
 Normalize endpoint I/O (OpResult-shaped JSON errors, receipts with before/after tokens,
 degraded/gap reporting from compact receipts), add `GET /lhc/threads` (lineage-joined listing),
 document all endpoints with curl examples in `docs/lhc/operations.md`. Acceptance: doc-driven
@@ -305,25 +305,25 @@ smoke script exercises every endpoint green against a dev server.
 Milestone: same end-to-end story as Phase 2, on Codex.
 
 **Slice 4.0 — probe: app-server `thread/resume` on synthetic rollout + rebuilder dependency
-check.** *(moderate)*
+check.** _(moderate)_
 Hand-place a synthetic rollout (per the codex-lhc format report) under the instance's
 `CODEX_HOME/sessions/`, resume it through t3code's Codex adapter path, codename-recall probe.
 Simultaneously: check codex-lhc's rebuilder status in liminal-context — consume it if landed;
 otherwise absorb the rebuild slice here (budget grows by roughly its Phase-2.2 slice). Deliverable:
 `docs/lhc/findings/codex-swap.md` + a consume-vs-absorb ruling logged in `impl-log.md`.
 
-**Slice 4.1 — Codex rebuilder integration.** *(moderate if consumed; hard if absorbed)*
+**Slice 4.1 — Codex rebuilder integration.** _(moderate if consumed; hard if absorbed)_
 As 2.1, for codex rollout format into `CODEX_HOME/sessions/YYYY/MM/DD/`, new thread id minted,
 registration-by-file-placement per the codex-lhc findings.
 
-**Slice 4.2 — Codex swap orchestration + auto-compact suppression.** *(moderate-hard)*
+**Slice 4.2 — Codex swap orchestration + auto-compact suppression.** _(moderate-hard)_
 As 2.2 via the Codex session path (`thread/resume` with the new id; t3code's resume-fallback
 must not silently fresh-start — detect and surface). Suppress native auto-compact via
 `model_auto_compact_token_limit` injection in the fork's Codex config path, flag-gated.
 Acceptance: mirror of 2.2's, plus fallback-to-fresh-start is detected as swap failure, not
 silent success.
 
-**Slice 4.3 — Codex end-to-end acceptance run.** *(moderate; verification slice)*
+**Slice 4.3 — Codex end-to-end acceptance run.** _(moderate; verification slice)_
 Mirror of 2.4 on a Codex thread.
 
 ### Phase 5 — Dogfood and hardening
