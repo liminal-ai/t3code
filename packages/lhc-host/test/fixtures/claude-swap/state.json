@@ -1,0 +1,120 @@
+{
+  "cwd": "/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-claude-swap-MPRYe5",
+  "baselineThreadId": "claude-swap-baseline-1783433769552",
+  "baselineSessionId": "04df30f8-c664-4a56-aa5c-ac6528d1b8e1",
+  "baselineRolloutPath": "/Users/leemoore/.claude/projects/-private-var-folders-m5-x5w9fw4929lbwqs1j-kndhbh0000gn-T-t3-claude-swap-MPRYe5/04df30f8-c664-4a56-aa5c-ac6528d1b8e1.jsonl",
+  "baselineStartCursor": {
+    "threadId": "claude-swap-baseline-1783433769552",
+    "resume": "04df30f8-c664-4a56-aa5c-ac6528d1b8e1",
+    "turnCount": 0
+  },
+  "baselineFinalCursor": {
+    "threadId": "claude-swap-baseline-1783433769552",
+    "resume": "04df30f8-c664-4a56-aa5c-ac6528d1b8e1",
+    "resumeSessionAt": "6684286f-4967-4bfb-84bb-fcfd30f47ae0",
+    "turnCount": 1
+  },
+  "rebuiltSessionId": "c3d7ea24-7e45-4c65-93d8-f75631cf6135",
+  "rebuiltRolloutPath": "/Users/leemoore/.claude/projects/-private-var-folders-m5-x5w9fw4929lbwqs1j-kndhbh0000gn-T-t3-claude-swap-MPRYe5/c3d7ea24-7e45-4c65-93d8-f75631cf6135.jsonl",
+  "rebuiltLineCount": 4,
+  "swap": {
+    "answer": "BRONZE-HERON-77",
+    "verdict": "SUCCESS: rebuilt file content recalled",
+    "startCursor": {
+      "threadId": "claude-swap-swap-1783433795445",
+      "resume": "c3d7ea24-7e45-4c65-93d8-f75631cf6135",
+      "turnCount": 0
+    },
+    "finalCursor": {
+      "threadId": "claude-swap-swap-1783433795445",
+      "resume": "c3d7ea24-7e45-4c65-93d8-f75631cf6135",
+      "resumeSessionAt": "efe35169-4829-4872-a757-94f8fe5ef7f6",
+      "turnCount": 1
+    },
+    "providerThreadIds": ["c3d7ea24-7e45-4c65-93d8-f75631cf6135"],
+    "rebuiltFileLinesBefore": 4,
+    "rebuiltFileLinesAfter": 14,
+    "rebuiltFileGrew": true
+  },
+  "missing": {
+    "ghostSessionId": "642af6a7-fc73-4073-b1cc-379e9094a03f",
+    "startSessionOutcome": {
+      "status": "succeeded",
+      "resumeCursor": {
+        "threadId": "claude-swap-missing-1783433821757",
+        "resume": "642af6a7-fc73-4073-b1cc-379e9094a03f",
+        "turnCount": 0
+      }
+    },
+    "turnOutcome": {
+      "status": "completed",
+      "completion": {
+        "type": "turn.completed",
+        "eventId": "0020c52d-5832-4218-a0c3-57e4b66efc89",
+        "provider": "claudeAgent",
+        "createdAt": "2026-07-07T14:17:02.544Z",
+        "threadId": "claude-swap-missing-1783433821757",
+        "turnId": "920301bd-723c-4da7-8335-e644ad475ecf",
+        "payload": {
+          "state": "failed",
+          "stopReason": null,
+          "usage": {
+            "input_tokens": 0,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+            "output_tokens": 0,
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 0,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "",
+            "iterations": [],
+            "speed": "standard"
+          },
+          "modelUsage": {},
+          "totalCostUsd": 0,
+          "errorMessage": "No conversation found with session ID: 642af6a7-fc73-4073-b1cc-379e9094a03f"
+        },
+        "providerRefs": {}
+      },
+      "answer": ""
+    },
+    "errorEvents": [
+      {
+        "type": "runtime.error",
+        "eventId": "5dd7b12b-1b81-4ec8-afa5-6d5fce116738",
+        "provider": "claudeAgent",
+        "createdAt": "2026-07-07T14:17:02.335Z",
+        "threadId": "claude-swap-missing-1783433821757",
+        "turnId": "920301bd-723c-4da7-8335-e644ad475ecf",
+        "payload": {
+          "message": "No conversation found with session ID: 642af6a7-fc73-4073-b1cc-379e9094a03f",
+          "class": "provider_error"
+        },
+        "providerRefs": {}
+      },
+      {
+        "type": "runtime.error",
+        "eventId": "fb3e5136-866e-466a-854d-2f57dba080ef",
+        "provider": "claudeAgent",
+        "createdAt": "2026-07-07T14:17:02.546Z",
+        "threadId": "claude-swap-missing-1783433821757",
+        "payload": {
+          "message": "Claude runtime stream failed.",
+          "class": "provider_error",
+          "detail": {
+            "failureCount": 1,
+            "failureTags": ["ProviderAdapterProcessError"]
+          }
+        },
+        "providerRefs": {}
+      }
+    ],
+    "ghostRolloutCreated": false
+  }
+}

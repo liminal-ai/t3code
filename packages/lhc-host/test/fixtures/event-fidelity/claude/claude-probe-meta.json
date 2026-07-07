@@ -1,0 +1,237 @@
+{
+  "provider": "claude",
+  "driver": "claudeAgent",
+  "threadId": "event-fidelity-claude-1783432832555",
+  "cwd": "/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-event-fidelity-claude-sje02o",
+  "session": {
+    "threadId": "event-fidelity-claude-1783432832555",
+    "provider": "claudeAgent",
+    "providerInstanceId": "claudeAgent",
+    "status": "ready",
+    "runtimeMode": "full-access",
+    "cwd": "/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-event-fidelity-claude-sje02o",
+    "resumeCursor": {
+      "threadId": "event-fidelity-claude-1783432832555",
+      "resume": "5c185c5a-dd0a-448e-b915-8b16817fc16a",
+      "turnCount": 0
+    },
+    "createdAt": "2026-07-07T14:00:32.557Z",
+    "updatedAt": "2026-07-07T14:00:32.557Z"
+  },
+  "normalizedPath": "/Users/leemoore/code/t3code-lhc/t3code/packages/lhc-host/test/fixtures/event-fidelity/claude/claude-normalized.full.jsonl",
+  "nativeLogPath": "/Users/leemoore/code/t3code-lhc/t3code/packages/lhc-host/test/fixtures/event-fidelity/claude/claude-native.log",
+  "turns": [
+    {
+      "label": "large-tool-output",
+      "prompt": "Run `seq 1 20000` in this git repo, then answer with exactly `last number: 20000` and no extra prose.",
+      "turnId": "ecb723ba-d9ab-4d59-8287-30c37b379f9b",
+      "completion": {
+        "status": "turn.completed",
+        "event": {
+          "type": "turn.completed",
+          "eventId": "9e0b2d5a-57f4-4a2c-bb4a-3b130da304b5",
+          "provider": "claudeAgent",
+          "createdAt": "2026-07-07T14:00:43.889Z",
+          "threadId": "event-fidelity-claude-1783432832555",
+          "turnId": "ecb723ba-d9ab-4d59-8287-30c37b379f9b",
+          "payload": {
+            "state": "completed",
+            "stopReason": "end_turn",
+            "usage": {
+              "input_tokens": 3257,
+              "cache_creation_input_tokens": 8042,
+              "cache_read_input_tokens": 36766,
+              "output_tokens": 117,
+              "server_tool_use": {
+                "web_search_requests": 0,
+                "web_fetch_requests": 0
+              },
+              "service_tier": "standard",
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 8042,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "inference_geo": "not_available",
+              "iterations": [
+                {
+                  "input_tokens": 2,
+                  "output_tokens": 8,
+                  "cache_read_input_tokens": 20112,
+                  "cache_creation_input_tokens": 4584,
+                  "cache_creation": {
+                    "ephemeral_5m_input_tokens": 0,
+                    "ephemeral_1h_input_tokens": 4584
+                  },
+                  "type": "message"
+                }
+              ],
+              "speed": "standard"
+            },
+            "modelUsage": {
+              "claude-haiku-4-5-20251001": {
+                "inputTokens": 547,
+                "outputTokens": 14,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0,
+                "webSearchRequests": 0,
+                "costUSD": 0.0006169999999999999,
+                "contextWindow": 200000,
+                "maxOutputTokens": 32000
+              },
+              "claude-fable-5": {
+                "inputTokens": 3257,
+                "outputTokens": 117,
+                "cacheReadInputTokens": 36766,
+                "cacheCreationInputTokens": 8042,
+                "webSearchRequests": 0,
+                "costUSD": 0.236026,
+                "contextWindow": 1000000,
+                "maxOutputTokens": 64000
+              }
+            },
+            "totalCostUsd": 0.23664300000000002
+          },
+          "providerRefs": {}
+        }
+      }
+    },
+    {
+      "label": "file-edit",
+      "prompt": "Create or overwrite a file named event-fidelity-small.txt with the exact text `event fidelity file edit probe` followed by a newline. Then briefly say what you changed.",
+      "turnId": "4a5ea244-9c0d-44c5-8061-8a6d2986c3bf",
+      "completion": {
+        "status": "turn.completed",
+        "event": {
+          "type": "turn.completed",
+          "eventId": "d44716fb-eab6-484f-b333-24a5cc6fc0bf",
+          "provider": "claudeAgent",
+          "createdAt": "2026-07-07T14:00:54.664Z",
+          "threadId": "event-fidelity-claude-1783432832555",
+          "turnId": "4a5ea244-9c0d-44c5-8061-8a6d2986c3bf",
+          "payload": {
+            "state": "completed",
+            "stopReason": "end_turn",
+            "usage": {
+              "input_tokens": 4,
+              "cache_creation_input_tokens": 309,
+              "cache_read_input_tokens": 49458,
+              "output_tokens": 192,
+              "server_tool_use": {
+                "web_search_requests": 0,
+                "web_fetch_requests": 0
+              },
+              "service_tier": "standard",
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 309,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "inference_geo": "not_available",
+              "iterations": [
+                {
+                  "input_tokens": 2,
+                  "output_tokens": 46,
+                  "cache_read_input_tokens": 24762,
+                  "cache_creation_input_tokens": 243,
+                  "cache_creation": {
+                    "ephemeral_5m_input_tokens": 0,
+                    "ephemeral_1h_input_tokens": 243
+                  },
+                  "type": "message"
+                }
+              ],
+              "speed": "standard"
+            },
+            "modelUsage": {
+              "claude-haiku-4-5-20251001": {
+                "inputTokens": 547,
+                "outputTokens": 14,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0,
+                "webSearchRequests": 0,
+                "costUSD": 0.0006169999999999999,
+                "contextWindow": 200000,
+                "maxOutputTokens": 32000
+              },
+              "claude-fable-5": {
+                "inputTokens": 3261,
+                "outputTokens": 309,
+                "cacheReadInputTokens": 86224,
+                "cacheCreationInputTokens": 8351,
+                "webSearchRequests": 0,
+                "costUSD": 0.301304,
+                "contextWindow": 1000000,
+                "maxOutputTokens": 64000
+              }
+            },
+            "totalCostUsd": 0.301921
+          },
+          "providerRefs": {}
+        }
+      }
+    },
+    {
+      "label": "interrupt",
+      "prompt": "Start a deliberately slow shell command: `for i in $(seq 1 120); do echo slow-$i; sleep 1; done`. Keep it running until interrupted.",
+      "turnId": "d2c3a204-4211-4e41-99ea-047c4cc6bb46",
+      "completion": {
+        "status": "turn.completed",
+        "event": {
+          "type": "turn.completed",
+          "eventId": "2df4737f-f209-440d-be72-143075682fbd",
+          "provider": "claudeAgent",
+          "createdAt": "2026-07-07T14:00:58.472Z",
+          "threadId": "event-fidelity-claude-1783432832555",
+          "turnId": "d2c3a204-4211-4e41-99ea-047c4cc6bb46",
+          "payload": {
+            "state": "failed",
+            "stopReason": null,
+            "usage": {
+              "input_tokens": 0,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0,
+              "output_tokens": 0,
+              "server_tool_use": {
+                "web_search_requests": 0,
+                "web_fetch_requests": 0
+              },
+              "service_tier": "standard",
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 0,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "inference_geo": "",
+              "iterations": [],
+              "speed": "standard"
+            },
+            "modelUsage": {
+              "claude-haiku-4-5-20251001": {
+                "inputTokens": 547,
+                "outputTokens": 14,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0,
+                "webSearchRequests": 0,
+                "costUSD": 0.0006169999999999999,
+                "contextWindow": 200000,
+                "maxOutputTokens": 32000
+              },
+              "claude-fable-5": {
+                "inputTokens": 3261,
+                "outputTokens": 309,
+                "cacheReadInputTokens": 86224,
+                "cacheCreationInputTokens": 8351,
+                "webSearchRequests": 0,
+                "costUSD": 0.301304,
+                "contextWindow": 1000000,
+                "maxOutputTokens": 64000
+              }
+            },
+            "totalCostUsd": 0.301921,
+            "errorMessage": "[ede_diagnostic] result_type=user last_content_type=n/a stop_reason=null"
+          },
+          "providerRefs": {}
+        }
+      }
+    }
+  ],
+  "finishedAt": "2026-07-07T14:00:58.867Z"
+}

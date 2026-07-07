@@ -1,0 +1,191 @@
+[
+  {
+    "kind": "turns",
+    "lines": [
+      {
+        "line": 5,
+        "type": "turn.started",
+        "turnId": "019f3ce0-dc61-7253-922d-32cba6f70364",
+        "payload": {}
+      },
+      {
+        "line": 23,
+        "type": "turn.completed",
+        "turnId": "019f3ce0-dc61-7253-922d-32cba6f70364",
+        "payload": {
+          "state": "completed"
+        }
+      },
+      {
+        "line": 25,
+        "type": "turn.started",
+        "turnId": "019f3ce0-f0f9-7d83-99f1-fb53d5139055",
+        "payload": {}
+      },
+      {
+        "line": 89,
+        "type": "turn.completed",
+        "turnId": "019f3ce0-f0f9-7d83-99f1-fb53d5139055",
+        "payload": {
+          "state": "completed"
+        }
+      },
+      {
+        "line": 91,
+        "type": "turn.started",
+        "turnId": "019f3ce1-0c6d-7812-b929-09c5dbad7ae4",
+        "payload": {}
+      },
+      {
+        "line": 119,
+        "type": "turn.completed",
+        "turnId": "019f3ce1-0c6d-7812-b929-09c5dbad7ae4",
+        "payload": {
+          "state": "interrupted"
+        }
+      }
+    ]
+  },
+  {
+    "itemId": "daf4b2f9-e834-4d50-9fe9-e0d6eabbb2fa",
+    "itemType": "user_message",
+    "eventLines": [6, 7],
+    "deltaBytesByKind": {},
+    "completedPayloadBytes": 456,
+    "completedLine": 7,
+    "completedDetailBytes": 0,
+    "completedDataBytes": 377,
+    "rawPayloadBytes": 377
+  },
+  {
+    "itemId": "call_0qrA4ZbtILjCgJFLBNH4QDEa",
+    "itemType": "command_execution",
+    "eventLines": [8, 9],
+    "deltaBytesByKind": {},
+    "completedPayloadBytes": 129526,
+    "completedLine": 9,
+    "completedDetailBytes": 26,
+    "completedDataBytes": 129405,
+    "rawPayloadBytes": 129405
+  },
+  {
+    "itemId": "msg_049ee6b6f80cc798016a4d06621b70819790098923aaae9495",
+    "itemType": "assistant_message",
+    "eventLines": [12, 19],
+    "deltaBytesByKind": {},
+    "completedPayloadBytes": 414,
+    "completedLine": 19,
+    "completedDetailBytes": 18,
+    "completedDataBytes": 295,
+    "rawPayloadBytes": 295
+  },
+  {
+    "itemId": "msg_049ee6b6f80cc798016a4d06621b70819790098923aaae9495",
+    "itemType": "unknown",
+    "eventLines": [13, 14, 15, 16, 17, 18],
+    "deltaBytesByKind": {
+      "assistant_text": 18
+    },
+    "completedPayloadBytes": 0
+  },
+  {
+    "itemId": "58dcf5f0-2c61-430c-980d-a906a83cc0a8",
+    "itemType": "user_message",
+    "eventLines": [26, 27],
+    "deltaBytesByKind": {},
+    "completedPayloadBytes": 523,
+    "completedLine": 27,
+    "completedDetailBytes": 0,
+    "completedDataBytes": 444,
+    "rawPayloadBytes": 444
+  },
+  {
+    "itemId": "msg_049ee6b6f80cc798016a4d066643cc8197a986091135ec14b2",
+    "itemType": "assistant_message",
+    "eventLines": [28, 55],
+    "deltaBytesByKind": {},
+    "completedPayloadBytes": 612,
+    "completedLine": 55,
+    "completedDetailBytes": 118,
+    "completedDataBytes": 393,
+    "rawPayloadBytes": 393
+  },
+  {
+    "itemId": "msg_049ee6b6f80cc798016a4d066643cc8197a986091135ec14b2",
+    "itemType": "unknown",
+    "eventLines": [
+      29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51,
+      52, 53, 54
+    ],
+    "deltaBytesByKind": {
+      "assistant_text": 118
+    },
+    "completedPayloadBytes": 0
+  },
+  {
+    "itemId": "call_sJz7NcMfDGNXs46hZqNVjYnm",
+    "itemType": "command_execution",
+    "eventLines": [56, 57],
+    "deltaBytesByKind": {},
+    "completedPayloadBytes": 1244,
+    "completedLine": 57,
+    "completedDetailBytes": 127,
+    "completedDataBytes": 1018,
+    "rawPayloadBytes": 1018
+  },
+  {
+    "itemId": "msg_049ee6b6f80cc798016a4d0668e7148197aec0ad3b717282cc",
+    "itemType": "assistant_message",
+    "eventLines": [60, 85],
+    "deltaBytesByKind": {},
+    "completedPayloadBytes": 574,
+    "completedLine": 85,
+    "completedDetailBytes": 94,
+    "completedDataBytes": 375,
+    "rawPayloadBytes": 375
+  },
+  {
+    "itemId": "msg_049ee6b6f80cc798016a4d0668e7148197aec0ad3b717282cc",
+    "itemType": "unknown",
+    "eventLines": [
+      61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84
+    ],
+    "deltaBytesByKind": {
+      "assistant_text": 94
+    },
+    "completedPayloadBytes": 0
+  },
+  {
+    "itemId": "0b808015-17e9-4481-b2e3-30ee2170e66d",
+    "itemType": "user_message",
+    "eventLines": [92, 93],
+    "deltaBytesByKind": {},
+    "completedPayloadBytes": 487,
+    "completedLine": 93,
+    "completedDetailBytes": 0,
+    "completedDataBytes": 408,
+    "rawPayloadBytes": 408
+  },
+  {
+    "itemId": "msg_049ee6b6f80cc798016a4d066abe588197b897b955f4aabc6e",
+    "itemType": "assistant_message",
+    "eventLines": [94, 115],
+    "deltaBytesByKind": {},
+    "completedPayloadBytes": 590,
+    "completedLine": 115,
+    "completedDetailBytes": 107,
+    "completedDataBytes": 382,
+    "rawPayloadBytes": 382
+  },
+  {
+    "itemId": "msg_049ee6b6f80cc798016a4d066abe588197b897b955f4aabc6e",
+    "itemType": "unknown",
+    "eventLines": [
+      95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114
+    ],
+    "deltaBytesByKind": {
+      "assistant_text": 107
+    },
+    "completedPayloadBytes": 0
+  }
+]

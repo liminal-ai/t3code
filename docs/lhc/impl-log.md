@@ -53,3 +53,37 @@ launch/completion time. Newest entries at the bottom. Format:
 - next: launch probes — 0.4 (concurrency harness, GPT-5.5, no dev server needed) can start
   immediately in a worktree; 0.2/0.3 need a running dev server + authed provider CLIs
   (machine choice: this Mac vs Linux box — Lee to confirm, defaulting to Mac).
+
+## 2026-07-07 — Slices 0.2, 0.3, 0.4: all Phase 0 probes done and converged
+
+- status: done
+- who: 0.2 GPT-5.5 high (run -2ded25, 13.3m), verified Fable high (ACCEPT). 0.3 Fable high
+  (run -2669b4, 7.7m), verified GPT-5.5 high (REVISE→doc revision→converged). 0.4 GPT-5.5
+  high (run -e32ebb, 8.5m), verified Fable high (REVISE→4 fixes→converged, real smoke green
+  46.6s on haiku).
+- what:
+  **0.2 (event fidelity)** — findings/event-fidelity.md. Codex: `item.completed` fully
+  sufficient (108,894-byte aggregatedOutput verified byte-exact; normalized stream carries
+  MORE than the rollout). Claude: LOSSY two ways — (a) user prompts emit NO completed
+  user_message item; (b) large tool output truncates to ~3KB payload (`<persisted-output>`
+  wrapper; full 108,894 bytes only in the Agent SDK sidecar file it names). Both providers:
+  interrupts are `turn.completed` with state interrupted/failed — `turn.aborted` never
+  fires. Correlation via itemId stable. Tap ruling: Codex = item.completed as-is; Claude =
+  needs remedy (in-fork adapter payload patch preferred; sidecar/raw fallback).
+  **0.3 (Claude swap)** — findings/claude-swap.md. Swap recipe VERIFIED first-try at
+  adapter level: cc-lhc rebuild-core line shape + `resumeCursor:{resume:<newId>}` resumes
+  the rebuilt file (BRONZE-HERON-77 recall), new turns append to it, sessions-index NOT
+  required. Failure modes: ghost uuid detectable at first turn ("No conversation found");
+  non-uuid cursor silently → fresh session (pre-validate!). Flip must actively write cursor
+  (ProviderSessionDirectory upsert preserves omitted field) after stop/quiesce;
+  resumeSessionAt cleared on flip. Races for 2.2 checklist: file-delete-between-check-and-
+  turn; reaper revival.
+  **0.4 (concurrency)** — findings/concurrency.md + harness in
+  packages/lhc-host/test/concurrency/. No SDK correctness defects at 10–20 threads (clean
+  drains, no contamination, no leftover work, retries don't wedge neighbors). SDK has NO
+  global inference cap (concurrency == thread count, architecturally confirmed) — host must
+  cap; recommendation 8. Real `claude -p` smoke green, flag-gated, env can't leak paid
+  calls into simulated tests.
+- next: Phase 1 — launch 1.1 (mapper, GPT-5.5 high). Mapper design must incorporate 0.2
+  rulings: Claude user_prompt captured host-side from sendTurn input (not the stream);
+  Claude tool-output remedy decided in 1.1 brief (adapter patch vs sidecar read).

@@ -1,0 +1,142 @@
+{
+  "provider": "codex",
+  "driver": "codex",
+  "threadId": "event-fidelity-codex-1783432797033",
+  "cwd": "/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-event-fidelity-codex-2CSpMS",
+  "session": {
+    "provider": "codex",
+    "providerInstanceId": "codex",
+    "status": "ready",
+    "runtimeMode": "full-access",
+    "cwd": "/var/folders/m5/x5w9fw4929lbwqs1j_kndhbh0000gn/T/t3-event-fidelity-codex-2CSpMS",
+    "threadId": "event-fidelity-codex-1783432797033",
+    "createdAt": "2026-07-07T13:59:57.039Z",
+    "updatedAt": "2026-07-07T13:59:57.279Z",
+    "model": "gpt-5.5",
+    "resumeCursor": {
+      "threadId": "019f3ce0-dbdf-7dc2-9094-bb7f5cf3edb2"
+    }
+  },
+  "normalizedPath": "/Users/leemoore/code/t3code-lhc/t3code/packages/lhc-host/test/fixtures/event-fidelity/codex/codex-normalized.full.jsonl",
+  "nativeLogPath": "/Users/leemoore/code/t3code-lhc/t3code/packages/lhc-host/test/fixtures/event-fidelity/codex/codex-native.log",
+  "turns": [
+    {
+      "label": "large-tool-output",
+      "prompt": "Run `seq 1 20000` in this git repo, then answer with exactly `last number: 20000` and no extra prose.",
+      "turnId": "019f3ce0-dc61-7253-922d-32cba6f70364",
+      "completion": {
+        "status": "turn.completed",
+        "event": {
+          "eventId": "cd6eca81-1759-46dd-ad58-f73981cd806f",
+          "provider": "codex",
+          "threadId": "event-fidelity-codex-1783432797033",
+          "createdAt": "2026-07-07T14:00:02.373Z",
+          "turnId": "019f3ce0-dc61-7253-922d-32cba6f70364",
+          "providerRefs": {
+            "providerTurnId": "019f3ce0-dc61-7253-922d-32cba6f70364"
+          },
+          "raw": {
+            "source": "codex.app-server.notification",
+            "method": "turn/completed",
+            "payload": {
+              "threadId": "019f3ce0-dbdf-7dc2-9094-bb7f5cf3edb2",
+              "turn": {
+                "completedAt": 1783432802,
+                "durationMs": 5089,
+                "error": null,
+                "id": "019f3ce0-dc61-7253-922d-32cba6f70364",
+                "items": [],
+                "itemsView": "notLoaded",
+                "startedAt": 1783432797,
+                "status": "completed"
+              }
+            }
+          },
+          "type": "turn.completed",
+          "payload": {
+            "state": "completed"
+          }
+        }
+      }
+    },
+    {
+      "label": "file-edit",
+      "prompt": "Create or overwrite a file named event-fidelity-small.txt with the exact text `event fidelity file edit probe` followed by a newline. Then briefly say what you changed.",
+      "turnId": "019f3ce0-f0f9-7d83-99f1-fb53d5139055",
+      "completion": {
+        "status": "turn.completed",
+        "event": {
+          "eventId": "e1f6e361-9b88-48de-a3c0-68c2e8dfa520",
+          "provider": "codex",
+          "threadId": "event-fidelity-codex-1783432797033",
+          "createdAt": "2026-07-07T14:00:09.342Z",
+          "turnId": "019f3ce0-f0f9-7d83-99f1-fb53d5139055",
+          "providerRefs": {
+            "providerTurnId": "019f3ce0-f0f9-7d83-99f1-fb53d5139055"
+          },
+          "raw": {
+            "source": "codex.app-server.notification",
+            "method": "turn/completed",
+            "payload": {
+              "threadId": "019f3ce0-dbdf-7dc2-9094-bb7f5cf3edb2",
+              "turn": {
+                "completedAt": 1783432809,
+                "durationMs": 6764,
+                "error": null,
+                "id": "019f3ce0-f0f9-7d83-99f1-fb53d5139055",
+                "items": [],
+                "itemsView": "notLoaded",
+                "startedAt": 1783432802,
+                "status": "completed"
+              }
+            }
+          },
+          "type": "turn.completed",
+          "payload": {
+            "state": "completed"
+          }
+        }
+      }
+    },
+    {
+      "label": "interrupt",
+      "prompt": "Start a deliberately slow shell command: `for i in $(seq 1 120); do echo slow-$i; sleep 1; done`. Keep it running until interrupted.",
+      "turnId": "019f3ce1-0c6d-7812-b929-09c5dbad7ae4",
+      "completion": {
+        "status": "turn.completed",
+        "event": {
+          "eventId": "e6af9fac-0451-4cde-87cf-4c09f8972cd0",
+          "provider": "codex",
+          "threadId": "event-fidelity-codex-1783432797033",
+          "createdAt": "2026-07-07T14:00:11.590Z",
+          "turnId": "019f3ce1-0c6d-7812-b929-09c5dbad7ae4",
+          "providerRefs": {
+            "providerTurnId": "019f3ce1-0c6d-7812-b929-09c5dbad7ae4"
+          },
+          "raw": {
+            "source": "codex.app-server.notification",
+            "method": "turn/completed",
+            "payload": {
+              "threadId": "019f3ce0-dbdf-7dc2-9094-bb7f5cf3edb2",
+              "turn": {
+                "completedAt": 1783432811,
+                "durationMs": 2007,
+                "error": null,
+                "id": "019f3ce1-0c6d-7812-b929-09c5dbad7ae4",
+                "items": [],
+                "itemsView": "notLoaded",
+                "startedAt": 1783432809,
+                "status": "interrupted"
+              }
+            }
+          },
+          "type": "turn.completed",
+          "payload": {
+            "state": "interrupted"
+          }
+        }
+      }
+    }
+  ],
+  "finishedAt": "2026-07-07T14:00:11.853Z"
+}
