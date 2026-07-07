@@ -12,8 +12,6 @@
 //
 // Usage: node --import ./packages/lhc-host/probes/ts-js-resolve-hook.mjs <entry.ts> ...
 import * as NodeModule from "node:module";
-import * as NodeFS from "node:fs";
-import { fileURLToPath } from "node:url";
 
 NodeModule.registerHooks({
   resolve(specifier, context, nextResolve) {

@@ -169,3 +169,24 @@ launch/completion time. Newest entries at the bottom. Format:
 - next: Phase 2 — Slice 2.1 (cc-lhc rebuilder port, Composer) and 2.3 (auto-compact
   suppression, Composer) are parallelizable; then 2.2 (swap orchestration + endpoints,
   GPT-5.5).
+
+## 2026-07-07 — Slices 2.1 (rebuilder port) and 2.3 (auto-compact suppression) done
+
+- status: done
+- who: both Composer (runs -b10095 2.8m, -bb2ed8 16.5m; 2.3 revision -37588d 0.9m),
+  both verified GPT-5.5 high (2.1 ACCEPT no drift; 2.3 REVISE→flags.ts hygiene→converged)
+- what: **2.1** — cc-lhc rollout rebuilder ported to packages/lhc-host/src/claude-swap/
+  (rebuild/write-rebuilt/types): sessions-index pipeline stripped per 0.3 findings,
+  claudeProjectsDir parameterized, realpath-encoded cwd feeds both path and envelope,
+  RebuildRolloutInput seam preserved for the future codex mirror; new integration test
+  rebuilds from a REAL getSessionThreadView. **2.3** — Claude native auto-compact
+  suppressed per-session via SDK options.settings.autoCompactEnabled:false (flag-settings
+  layer overrides user/project; field verified in sdk.d.ts). Flag
+  T3CODE_LHC_SUPPRESS_AUTOCOMPACT default-on, forced off under T3CODE_LHC_DISABLE, opt-out
+  =0/false. Lean src/flags.ts (side-effect-free) exported as ./flags so the adapter
+  doesn't pull the inference lane. Live proof deferred to 2.4 (check: no compact_boundary,
+  compactsAutomatically:false, control run with suppression off).
+- also: fixed 2 lint errors in 1.3 probe files (namespace-node-imports) that had slipped
+  past the gate — orchestrator process note: re-run vp check before every commit, and
+  delegate even trivial fixes.
+- next: Slice 2.2 — swap orchestration + endpoints (GPT-5.5 high), the Phase 2 core.

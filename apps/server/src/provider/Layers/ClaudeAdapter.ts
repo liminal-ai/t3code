@@ -67,6 +67,7 @@ import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
+import { isAutoCompactSuppressionEnabled } from "@t3tools/lhc-host/flags";
 import { resolveAttachmentPath } from "../../attachmentStore.ts";
 import { ServerConfig } from "../../config.ts";
 import * as McpProviderSession from "../../mcp/McpProviderSession.ts";
@@ -3566,6 +3567,10 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         ...(typeof thinking === "boolean" ? { alwaysThinkingEnabled: thinking } : {}),
         ...(fastMode ? { fastMode: true } : {}),
         ...(ultracode ? { ultracode: true } : {}),
+        // LHC (fork-local, slice 2.3): suppress Claude Code native auto-compact so
+        // LHC compaction owns the thread. Applied via SDK flag settings (highest
+        // user-controlled priority); see `isAutoCompactSuppressionEnabled`.
+        ...(isAutoCompactSuppressionEnabled() ? { autoCompactEnabled: false } : {}),
       };
       const mcpSession = McpProviderSession.readMcpProviderSession(input.threadId);
       const queryOptions: ClaudeQueryOptions = {

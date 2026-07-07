@@ -267,6 +267,35 @@ async function readFirstPromptMessage(
 const THREAD_ID = ThreadId.make("thread-claude-1");
 const RESUME_THREAD_ID = ThreadId.make("thread-claude-resume");
 
+function withProcessEnv<E, R>(
+  overrides: NodeJS.ProcessEnv,
+  run: () => Effect.Effect<void, E, R>,
+): Effect.Effect<void, E, R> {
+  const previous = new Map<string, string | undefined>();
+  for (const key of Object.keys(overrides)) {
+    previous.set(key, process.env[key]);
+    const value = overrides[key];
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+  return run().pipe(
+    Effect.ensuring(
+      Effect.sync(() => {
+        for (const [key, value] of previous) {
+          if (value === undefined) {
+            delete process.env[key];
+          } else {
+            process.env[key] = value;
+          }
+        }
+      }),
+    ),
+  );
+}
+
 describe("ClaudeAdapterLive", () => {
   it.effect("returns validation error for non-claude provider on startSession", () => {
     const harness = makeHarness();
@@ -572,6 +601,7 @@ describe("ClaudeAdapterLive", () => {
       const createInput = harness.getLastCreateQueryInput();
       assert.deepEqual(createInput?.options.settings, {
         alwaysThinkingEnabled: false,
+        autoCompactEnabled: false,
       });
     }).pipe(
       Effect.provideService(Random.Random, makeDeterministicRandomService()),
@@ -595,7 +625,9 @@ describe("ClaudeAdapterLive", () => {
       });
 
       const createInput = harness.getLastCreateQueryInput();
-      assert.equal(createInput?.options.settings, undefined);
+      assert.deepEqual(createInput?.options.settings, {
+        autoCompactEnabled: false,
+      });
     }).pipe(
       Effect.provideService(Random.Random, makeDeterministicRandomService()),
       Effect.provide(harness.layer),
@@ -620,6 +652,7 @@ describe("ClaudeAdapterLive", () => {
       const createInput = harness.getLastCreateQueryInput();
       assert.deepEqual(createInput?.options.settings, {
         fastMode: true,
+        autoCompactEnabled: false,
       });
     }).pipe(
       Effect.provideService(Random.Random, makeDeterministicRandomService()),
@@ -643,10 +676,89 @@ describe("ClaudeAdapterLive", () => {
       });
 
       const createInput = harness.getLastCreateQueryInput();
-      assert.equal(createInput?.options.settings, undefined);
+      assert.deepEqual(createInput?.options.settings, {
+        autoCompactEnabled: false,
+      });
     }).pipe(
       Effect.provideService(Random.Random, makeDeterministicRandomService()),
       Effect.provide(harness.layer),
+    );
+  });
+
+  it.effect("suppresses Claude native auto-compact via SDK flag settings by default", () => {
+    const harness = makeHarness();
+    return withProcessEnv(
+      {
+        T3CODE_LHC_DISABLE: undefined,
+        T3CODE_LHC_SUPPRESS_AUTOCOMPACT: undefined,
+      },
+      () =>
+        Effect.gen(function* () {
+          const adapter = yield* ClaudeAdapter;
+          yield* adapter.startSession({
+            threadId: THREAD_ID,
+            provider: ProviderDriverKind.make("claudeAgent"),
+            runtimeMode: "full-access",
+          });
+
+          const createInput = harness.getLastCreateQueryInput();
+          assert.deepEqual(createInput?.options.settings, {
+            autoCompactEnabled: false,
+          });
+        }).pipe(
+          Effect.provideService(Random.Random, makeDeterministicRandomService()),
+          Effect.provide(harness.layer),
+        ),
+    );
+  });
+
+  it.effect("omits auto-compact suppression when LHC capture is disabled", () => {
+    const harness = makeHarness();
+    return withProcessEnv(
+      {
+        T3CODE_LHC_DISABLE: "1",
+        T3CODE_LHC_SUPPRESS_AUTOCOMPACT: undefined,
+      },
+      () =>
+        Effect.gen(function* () {
+          const adapter = yield* ClaudeAdapter;
+          yield* adapter.startSession({
+            threadId: THREAD_ID,
+            provider: ProviderDriverKind.make("claudeAgent"),
+            runtimeMode: "full-access",
+          });
+
+          const createInput = harness.getLastCreateQueryInput();
+          assert.equal(createInput?.options.settings, undefined);
+        }).pipe(
+          Effect.provideService(Random.Random, makeDeterministicRandomService()),
+          Effect.provide(harness.layer),
+        ),
+    );
+  });
+
+  it.effect("omits auto-compact suppression when explicitly opted out", () => {
+    const harness = makeHarness();
+    return withProcessEnv(
+      {
+        T3CODE_LHC_DISABLE: undefined,
+        T3CODE_LHC_SUPPRESS_AUTOCOMPACT: "0",
+      },
+      () =>
+        Effect.gen(function* () {
+          const adapter = yield* ClaudeAdapter;
+          yield* adapter.startSession({
+            threadId: THREAD_ID,
+            provider: ProviderDriverKind.make("claudeAgent"),
+            runtimeMode: "full-access",
+          });
+
+          const createInput = harness.getLastCreateQueryInput();
+          assert.equal(createInput?.options.settings, undefined);
+        }).pipe(
+          Effect.provideService(Random.Random, makeDeterministicRandomService()),
+          Effect.provide(harness.layer),
+        ),
     );
   });
 

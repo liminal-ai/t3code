@@ -20,7 +20,7 @@
  */
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import * as NodeSqlite from "node:sqlite";
 
 import { inspect, messages, initLhc, createDeterministicInferenceCallbacks } from "lhc";
 
@@ -32,7 +32,9 @@ interface LineageRow {
 }
 
 function readLineage(home: string, t3ThreadId: string): LineageRow | undefined {
-  const db = new DatabaseSync(NodePath.join(home, "t3code-lhc.sqlite"), { readOnly: true });
+  const db = new NodeSqlite.DatabaseSync(NodePath.join(home, "t3code-lhc.sqlite"), {
+    readOnly: true,
+  });
   try {
     const row = db
       .prepare(
