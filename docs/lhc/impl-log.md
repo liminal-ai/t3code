@@ -214,3 +214,28 @@ launch/completion time. Newest entries at the bottom. Format:
   "No conversation found" as the silent-swap tells; don't send turns mid-swap.
 - next: Slice 2.4 — live acceptance run (compact a real >100k thread, verify resume onto
   compacted context + codename recall + auto-compact suppression live proof).
+
+## 2026-07-07 — Slice 2.4: live acceptance run — PHASE 2 COMPLETE
+
+- status: done (7 PASS, 2 PARTIAL, 0 FAIL)
+- who: Fable high (run -4bcfb3, 27.7m), orchestrator-accepted (acceptance run IS the
+  verification). Cost ~$5-10, dominated by the sonnet inference lane.
+- what: docs/lhc/findings/phase2-acceptance.md. THE CORE LOOP IS PROVEN LIVE: grow real
+  Claude (haiku) thread → POST /lhc/threads/:id/compact → 200 receipt → cursor names
+  rebuilt session id → next turn resumes FROM THE REBUILT ID and recalls
+  codename+fact from turn 1 → 2 more turns append to same LHC thread/rollout → prune
+  also round-trips. 404/409-busy surfaces correct. Neither silent-swap tell appeared.
+  Zero LHC warnings; derivations drained.
+- PARTIALs (shared root cause, not defects): (1) provider usedTokens plateaus ~34k in a
+  synthetic harness — Claude Code truncates/evicts tool output in-context, while the LHC
+  record carried the full 528,927-byte tool_result and tailTokens 940,055 with
+  compactRecommended:true — exactly the fidelity gap LHC exists to close. (2) the
+  suppression control also read compactsAutomatically:false because this box's user
+  ~/.claude/settings.json already sets autoCompactEnabled:false — suppression is
+  redundant HERE but unit-verified for boxes where the user setting is true; native
+  compact_boundary never appeared in any run.
+- phase-3 absorb list: assert on LHC tailTokens/compactRecommended in large-context
+  tests; integration-level assert of settings.autoCompactEnabled for the control;
+  deterministic swap_in_progress coverage.
+- next: Phase 3 (endpoint consolidation + operations doc — small), then Phase 4 (Codex:
+  4.0 synthetic thread/resume probe first).
