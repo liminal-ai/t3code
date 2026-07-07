@@ -151,3 +151,21 @@ launch/completion time. Newest entries at the bottom. Format:
   trimming/suppression — only providerInstanceId canonicalization.
 - next: Slice 1.3 — live capture validation on this Mac (orchestrator-driven): boot dev
   server, real Claude+Codex sessions via a WS driver, inspect checks, mid-session restart.
+
+## 2026-07-07 — Slice 1.3: live capture validation — PHASE 1 COMPLETE
+
+- status: done (all 7 checklist items PASS)
+- who: Fable high (run -c1c632, 40.6m; envelope errored on the final message but all work
+  completed and verified on disk — findings doc written, servers cleaned up)
+- what: docs/lhc/findings/live-capture-validation.md. Real server (port 4599, scratch
+  T3CODE_LHC_HOME) driven over the real /ws API. Claude 3-turn: reasoning + full 108,927-
+  byte tool result + host-injected prompts all in the LHC record, 14/14 derivations
+  ready. Codex 3-turn: no prompt-dedupe doubles, full aggregatedOutput. Interrupt →
+  runtime_note + closed turn. Real claude -p drain ~2-3s/turn. Mid-session server restart
+  → same LHC thread, exactly +4 events, zero replay dups. Kill switches proven both ways
+  (DISABLE creates nothing; NO_INFERENCE captures with zero inference children, positive
+  control confirms detector). Reusable ws-driver.ts/ws-scenario.ts/verify-lhc.ts probes
+  landed for Phase 2, including the server-boot + WS-auth recipe in the findings doc.
+- next: Phase 2 — Slice 2.1 (cc-lhc rebuilder port, Composer) and 2.3 (auto-compact
+  suppression, Composer) are parallelizable; then 2.2 (swap orchestration + endpoints,
+  GPT-5.5).
