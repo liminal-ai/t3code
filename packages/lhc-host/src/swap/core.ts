@@ -134,6 +134,7 @@ export interface LhcStatusReceipt {
 export interface LhcThreadInspectReceipt {
   t3ThreadId: string;
   lhcThreadId: string;
+  providerKind: string;
   overview: InspectOverview;
   health: HealthReport;
   viewStatus: ViewStatus;
@@ -392,6 +393,7 @@ export function createSwapController<Binding extends ProviderBinding, Cursor, Pa
 
   async function inspectThread(t3ThreadId: string): Promise<LhcThreadInspectReceipt> {
     const ref = await requireThreadRef(capture, t3ThreadId);
+    const lineageRow = capture.listCapturedThreads().find((row) => row.t3ThreadId === t3ThreadId);
     const sdk = capture.sdk!;
     const overview = assertOk(await sdk.inspect.overview(ref), "receipt", "swap_failed");
     const health = assertOk(await sdk.inspect.health(ref), "receipt", "swap_failed");
@@ -399,6 +401,7 @@ export function createSwapController<Binding extends ProviderBinding, Cursor, Pa
     return {
       t3ThreadId,
       lhcThreadId: ref.threadId,
+      providerKind: lineageRow?.providerKind ?? "unknown",
       overview,
       health,
       viewStatus,

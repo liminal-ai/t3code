@@ -25,7 +25,7 @@
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 import * as NodeChildProcess from "node:child_process";
-import { DatabaseSync } from "node:sqlite";
+import * as NodeSqlite from "node:sqlite";
 
 import * as Effect from "effect/Effect";
 
@@ -271,7 +271,7 @@ function readProviderRuntime(
 ): { resumeCursor: unknown; runtimePayload: unknown; raw: Record<string, unknown> } | null {
   const dbPath = NodePath.join(baseDir, "userdata", "state.sqlite");
   if (!NodeFS.existsSync(dbPath)) return null;
-  const db = new DatabaseSync(dbPath, { readOnly: true });
+  const db = new NodeSqlite.DatabaseSync(dbPath, { readOnly: true });
   try {
     const row = db
       .prepare(

@@ -83,7 +83,9 @@ import {
   renderProviderTraitsMenuContent,
   renderProviderTraitsPicker,
 } from "./composerProviderState";
-import { ContextWindowMeter } from "./ContextWindowMeter";
+// [t3code-lhc] begin
+import { ContextRingPopover } from "./ContextRingPopover";
+// [t3code-lhc] end
 import { buildExpandedImagePreview, type ExpandedImagePreview } from "./ExpandedImagePreview";
 import { basenameOfPath } from "../../pierre-icons";
 import { cn, randomUUID } from "~/lib/utils";
@@ -329,6 +331,9 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
 
 const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(props: {
   compact: boolean;
+  // [t3code-lhc] begin
+  activeThreadId: ThreadId | null;
+  // [t3code-lhc] end
   activeContextWindow: ReturnType<typeof deriveLatestContextWindowSnapshot>;
   activeThreadProviderDisplayName: string | null;
   isPreparingWorktree: boolean;
@@ -354,11 +359,15 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
   return (
     <>
       {props.activeContextWindow ? (
-        <ContextWindowMeter
+        // [t3code-lhc] begin
+        <ContextRingPopover
+          threadId={props.activeThreadId}
           usage={props.activeContextWindow}
           providerDisplayName={props.activeThreadProviderDisplayName}
+          turnInFlight={props.isRunning}
         />
-      ) : null}
+      ) : // [t3code-lhc] end
+      null}
       {props.isPreparingWorktree ? (
         <span className="text-muted-foreground/70 text-xs">Preparing worktree...</span>
       ) : null}
@@ -2539,6 +2548,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               >
                 <ComposerFooterPrimaryActions
                   compact={isComposerPrimaryActionsCompact}
+                  // [t3code-lhc] begin
+                  activeThreadId={activeThreadId}
+                  // [t3code-lhc] end
                   activeContextWindow={activeContextWindow}
                   activeThreadProviderDisplayName={activeThreadProviderDisplayName}
                   pendingAction={pendingPrimaryAction}
