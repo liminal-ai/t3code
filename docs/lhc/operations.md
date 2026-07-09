@@ -250,6 +250,47 @@ node --import ./packages/lhc-host/probes/ts-js-resolve-hook.mjs \
   packages/lhc-host/probes/verify-lhc.ts --home "$T3CODE_LHC_HOME" --t3-thread <t3ThreadId>
 ```
 
+## Sync smoke
+
+Run after every upstream merge or deploy to certify the full LHC path still works end-to-end
+(capture → compact/prune → resume) against **real** provider CLIs. The script is self-contained:
+scratch `T3CODE_LHC_HOME`, scratch t3 base dir, ephemeral port (never hardcoded — avoids
+colliding with dogfood servers), fresh git repo as cwd, teardown on all paths.
+
+```sh
+# From repo root (requires `claude` and `codex` on PATH and authenticated)
+node --import ./packages/lhc-host/probes/ts-js-resolve-hook.mjs \
+  packages/lhc-host/smoke/sync-smoke.ts
+```
+
+**Exit codes:** `0` = certified, `1` = broken.
+
+**Skip flags** (cheaper partial runs):
+
+| Flag            | Effect                                               |
+| --------------- | ---------------------------------------------------- |
+| `--skip-claude` | Skip the Claude (haiku) thread                       |
+| `--skip-codex`  | Skip the Codex (gpt-5.4-mini) thread                 |
+| `--keep`        | Leave temp dirs + server logs after teardown (debug) |
+
+**Budget:** ≤8 paid turns total (3 seed/grow + 1 resume per provider). Each turn hard-fails at
+120s — no retries.
+
+**Report:** `docs/lhc/sync-reports/<YYYY-MM-DD-HHmm>.md` — PASS/FAIL table per step, timings,
+rough cost estimate, and on failure the HTTP body / server-log tail for the failing step. The
+same table prints to stdout.
+
+**How to read a report:**
+
+- **boot / identity** — confirms we talked to the server we spawned (pid + `startedAt` guard
+  against a stale process on the same port).
+- **turns** — seed codename + small turn + `seq 1 2000` tool output.
+- **capture** — lineage row, `user_prompt` dedup, full (non-preview) `tool_result` bytes, closed turns.
+- **compact** (Claude) / **prune** (Codex) — receipt 200, cursor flipped to `newSessionId`,
+  `rebuiltPath` exists.
+- **resume** — recall turn returns the codename and cursor still names the rebuilt session id.
+- **status** — thread listed on `/lhc/status`; derivations not `failed`/`blocked` (waits up to 60s).
+
 ## Known limits
 
 | Limit                                    | Notes                                                                                                                                                                                                                                                             |

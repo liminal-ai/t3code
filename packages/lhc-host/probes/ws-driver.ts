@@ -49,6 +49,7 @@ export interface ServerRuntimeState {
   readonly port: number;
   readonly origin: string;
   readonly pid: number;
+  readonly startedAt: string;
 }
 
 /** Read `<baseDir>/userdata/server-runtime.json` to discover the live origin. */
@@ -59,8 +60,15 @@ export function resolveRuntimeState(baseDir: string): ServerRuntimeState {
     port: number;
     origin: string;
     pid: number;
+    startedAt: string;
   };
-  return { host: raw.host, port: raw.port, origin: raw.origin, pid: raw.pid };
+  return {
+    host: raw.host,
+    port: raw.port,
+    origin: raw.origin,
+    pid: raw.pid,
+    startedAt: raw.startedAt,
+  };
 }
 
 // ---------------------------------------------------------------------------

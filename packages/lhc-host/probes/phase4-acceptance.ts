@@ -514,7 +514,7 @@ async function main(): Promise<void> {
       const rebuiltAfterResume = codexRollout(rebuiltPath);
       const recallLine = rebuiltAfterResume.conversation
         .filter((c) => c.role === "assistant")
-        .reverse()
+        .toReversed()
         .find((c) => /codename/i.test(c.text) || new RegExp(CODENAME).test(c.text));
       journal.rebuiltAfterResume = {
         ...rebuiltAfterResume,
