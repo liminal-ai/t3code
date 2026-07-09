@@ -314,3 +314,27 @@ launch/completion time. Newest entries at the bottom. Format:
   (2) date-scoped rollout discovery (unbounded DFS over ~/.codex/sessions today);
   (3) backfill server-level route dispatch integration test if cheap.
 - next: Phase 5 — Linux box deployment + dogfood + version-hop rehearsal (needs Lee).
+
+## 2026-07-09 — Phase A: upstream sync + sync-smoke — COMPLETE
+
+- status: done
+- who: merge by orchestrator; A2 script Composer (run -3fcd20, 7.7m) + debug round
+  GPT-5.6-sol high (runs -c2e20e/-641391 — first Sol engagement, strong: found real
+  root causes, refused to claim green while Claude auth was expired)
+- what: merged upstream/main (19 commits, zero source conflicts; pnpm-lock only).
+  LESSON: pnpm auto-merge aborts on no-TTY and leaves markers — `CI=true pnpm install
+--no-frozen-lockfile`, then verify zero markers before committing. All gates green
+  on merged base; dogfood server bounced (identity-verified). Sync-smoke script landed
+  (packages/lhc-host/smoke/): scratch server on ephemeral port, pid+startedAt identity
+  check, 13-step certification (turns/capture/compact/prune/resume-recall/status per
+  provider), report to docs/lhc/sync-reports/, exit-code contract, ≤8 paid turns
+  (~$0.01/run). Three script bugs found ONLY by live runs (open-turn assertion,
+  delta-overwrite answer extraction, boot-banner evidence) — vindicates live-gate
+  design. First green report: sync-reports/2026-07-09-1945.md (13/13, 44.7s).
+  INCIDENT: Claude Code auth had expired on this box — killed inference lane +
+  claude turns until Lee re-authed. Smoke now detects this class (auth-failure answer
+  validation). 5.1 draft parked on branch lhc-51-draft.
+- model roster update (Lee): grok-4.5-high (cursor lane) and gpt-5.6-sol high (codex
+  lane) available; Sol validated on this slice.
+- next: Cursor + Grok swap-feasibility probes (4.0-style, parallel worktrees), then
+  ACP capture extension shaped by their verdicts.
