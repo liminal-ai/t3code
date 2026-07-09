@@ -63,6 +63,16 @@ function resolveAppVariant(value: string | undefined): AppVariant {
 
 const variant = VARIANT_CONFIG[APP_VARIANT];
 
+const dmSansFonts = {
+  regular: "@expo-google-fonts/dm-sans/400Regular/DMSans_400Regular.ttf",
+  medium: "@expo-google-fonts/dm-sans/500Medium/DMSans_500Medium.ttf",
+  bold: "@expo-google-fonts/dm-sans/700Bold/DMSans_700Bold.ttf",
+} as const;
+
+// These aliases match the fonts' PostScript names on iOS. Register the same
+// names on Android so React Native and the native composer use one set of
+// family names without waiting for runtime font loading.
+
 const config: ExpoConfig = {
   name: variant.appName,
   slug: "t3-code",
@@ -121,8 +131,32 @@ const config: ExpoConfig = {
     favicon: "./assets/favicon.png",
   },
   plugins: [
-    "expo-font",
+    [
+      "expo-font",
+      {
+        ios: {
+          fonts: [dmSansFonts.regular, dmSansFonts.medium, dmSansFonts.bold],
+        },
+        android: {
+          fonts: [
+            {
+              fontFamily: "DMSans-Regular",
+              fontDefinitions: [{ path: dmSansFonts.regular, weight: 400 }],
+            },
+            {
+              fontFamily: "DMSans-Medium",
+              fontDefinitions: [{ path: dmSansFonts.medium, weight: 500 }],
+            },
+            {
+              fontFamily: "DMSans-Bold",
+              fontDefinitions: [{ path: dmSansFonts.bold, weight: 700 }],
+            },
+          ],
+        },
+      },
+    ],
     "expo-secure-store",
+    "expo-sqlite",
     ["@clerk/expo", { theme: "./clerk-theme.json" }],
     "expo-web-browser",
     [
@@ -196,6 +230,15 @@ const config: ExpoConfig = {
       publishableKey: repoEnv.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? null,
       jwtTemplate: repoEnv.EXPO_PUBLIC_CLERK_JWT_TEMPLATE ?? null,
     },
+    // Native Google sign-in credentials. @clerk/expo reads these from `extra`
+    // under their exact env-var names (not nested), and its config plugin reads
+    // the iOS URL scheme at prebuild to register it in Info.plist.
+    // Unset values must be omitted (not null): the public manifest serializes
+    // null to {}, which is truthy and would defeat Clerk's fallback checks.
+    EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID: repoEnv.EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID,
+    EXPO_PUBLIC_CLERK_GOOGLE_IOS_CLIENT_ID: repoEnv.EXPO_PUBLIC_CLERK_GOOGLE_IOS_CLIENT_ID,
+    EXPO_PUBLIC_CLERK_GOOGLE_ANDROID_CLIENT_ID: repoEnv.EXPO_PUBLIC_CLERK_GOOGLE_ANDROID_CLIENT_ID,
+    EXPO_PUBLIC_CLERK_GOOGLE_IOS_URL_SCHEME: repoEnv.EXPO_PUBLIC_CLERK_GOOGLE_IOS_URL_SCHEME,
     observability: {
       tracesUrl: repoEnv.EXPO_PUBLIC_OTLP_TRACES_URL ?? "https://api.axiom.co/v1/traces",
       tracesDataset: repoEnv.EXPO_PUBLIC_OTLP_TRACES_DATASET ?? null,
