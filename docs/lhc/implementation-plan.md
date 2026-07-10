@@ -145,6 +145,12 @@ verify** (Lee's ruling, 2026-07-07):
   high verifies. Cross-perspective rule: Composer codes → GPT-5.5 verifies (never
   Claude-family: Composer is largely a distillation of old Claude usage); GPT-5.5 codes →
   Fable verifies.
+- **UPDATE (Lee's ruling, 2026-07-09): GPT-5.6 Sol high (`codex-subagent -m gpt-5.6-sol -c
+model_reasoning_effort=high`) is the default for ALL implementation from Phase A onward,
+  especially work needing dogged determination.** Validated on slice A2 (found real root
+  causes across two live-debug rounds; refused to certify while Claude auth was expired).
+  Composer remains available for light/mechanical work; grok-4.5-high (cursor lane) available
+  as alternate. Verification stays cross-family: Sol codes → Fable high verifies.
 - Verifiers are briefed with acceptance criteria, not the implementation. Findings route back
   to the coder (resume its session via `--resume`) until convergence.
 
