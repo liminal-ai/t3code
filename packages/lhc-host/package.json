@@ -35,7 +35,7 @@
   "dependencies": {
     "@t3tools/contracts": "workspace:*",
     "effect": "catalog:",
-    "lhc": "link:../../../../pi-long-horizon/liminal-context/packages/lhc"
+    "lhc": "link:../../vendor/lhc/packages/lhc"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
