@@ -1,4 +1,4 @@
-[submodule "vendor/lhc"]
-	path = vendor/lhc
+[submodule "vendor/long-horizon-context"]
+	path = vendor/long-horizon-context
 	url = https://github.com/liminal-ai/long-horizon-context.git
 	branch = main
