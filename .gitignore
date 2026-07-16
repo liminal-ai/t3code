@@ -1,4 +1,6 @@
 node_modules
+# Read-only submodule dependencies are checked in their own repositories.
+/vendor/
 .bun
 .turbo
 .DS_Store

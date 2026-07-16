@@ -838,7 +838,10 @@ async function main(): Promise<void> {
     baseDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-sync-smoke-base-"));
     lhcHome = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-sync-smoke-lhc-"));
     repoDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-sync-smoke-repo-"));
-    makeScratchRepo(repoDir);
+    const claudeRepoDir = NodePath.join(repoDir, "claude");
+    const codexRepoDir = NodePath.join(repoDir, "codex");
+    if (!skipClaude) makeScratchRepo(claudeRepoDir);
+    if (!skipCodex) makeScratchRepo(codexRepoDir);
 
     const pickedPort = await runner.run("setup:port", "pick free port", () => pickFreePort());
     if (pickedPort !== undefined) port = pickedPort;
@@ -868,7 +871,7 @@ async function main(): Promise<void> {
           bearer: auth.bearer,
           baseDir: baseDir!,
           lhcHome: lhcHome!,
-          workspaceRoot: repoDir!,
+          workspaceRoot: claudeRepoDir,
           runner,
           budget,
         });
@@ -881,7 +884,7 @@ async function main(): Promise<void> {
           bearer: auth.bearer,
           baseDir: baseDir!,
           lhcHome: lhcHome!,
-          workspaceRoot: repoDir!,
+          workspaceRoot: codexRepoDir,
           runner,
           budget,
         });

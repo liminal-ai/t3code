@@ -30,8 +30,7 @@ Runnable as: `node --import ./packages/lhc-host/probes/ts-js-resolve-hook.mjs pa
    the ws-scenario auth flow.
 3. **Per provider (Claude via haiku, Codex via gpt-5.4-mini + low reasoning — cheapest;
    skip flags respected)**:
-   a. Start thread, seed a codename fact, run 2 small turns (one with a modest `seq
-   2000`-style tool output).
+   a. Start a thread, seed a codename fact, and run two small turns, including one with a modest `seq 2000`-style tool output.
    b. Capture check: lineage row exists, `user_prompt` count == turns sent (no doubles),
    tool_result present with full (non-preview) output, turns close.
    c. Swap: compact for Claude, prune for Codex (covers both ops across both providers'
