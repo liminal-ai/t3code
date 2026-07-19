@@ -187,4 +187,98 @@ describe("writeRebuiltRollout from real SessionThreadView", () => {
     expect(assistantLines.length).toBeGreaterThanOrEqual(1);
     expect(userLines[0]?.message?.content).toContain("deployment codename");
   });
+
+  it("re-emits tool activity as NATIVE blocks end-to-end (thinking / tool_use / tool_result)", async () => {
+    const sdk = initLhc({
+      mode: "manual",
+      inferenceCallbacks: createDeterministicInferenceCallbacks(),
+    });
+    const created = assertOk(
+      await sdk.threads.newThread({
+        filePath: store.threadPath,
+        registryPath: store.registryPath,
+      }),
+    );
+
+    const toolBatch: MessageEventInput[] = [
+      {
+        eventKind: "user_prompt",
+        idempotencyKey: "tool-user-1",
+        actor: "a",
+        harness: "h",
+        payload: { text: "list the repo files" },
+      },
+      {
+        eventKind: "assistant_thinking",
+        idempotencyKey: "tool-think-1",
+        actor: "a",
+        harness: "h",
+        payload: { text: "I should run ls." },
+      },
+      {
+        eventKind: "tool_call",
+        idempotencyKey: "tool-call-1",
+        actor: "a",
+        harness: "h",
+        payload: { toolCallId: "toolu_e2e_01", toolName: "Bash", arguments: { command: "ls" } },
+      },
+      {
+        eventKind: "tool_result",
+        idempotencyKey: "tool-result-1",
+        actor: "tool",
+        harness: "h",
+        payload: { toolCallId: "toolu_e2e_01", content: "a.ts\nb.ts", isError: false },
+      },
+      {
+        eventKind: "assistant_text",
+        idempotencyKey: "tool-text-1",
+        actor: "a",
+        harness: "h",
+        payload: { text: "Two files." },
+      },
+      {
+        eventKind: "turn_end",
+        idempotencyKey: "tool-turn-end-1",
+        actor: "a",
+        harness: "h",
+        payload: {},
+      },
+    ];
+    assertOk(await sdk.intakeStream.messageEvents({ filePath: created.filePath }, toolBatch));
+
+    const view = assertOk(
+      await sdk.threadView.getSessionThreadView({ filePath: created.filePath }),
+    );
+    const newSessionId = "b2c3d4e5-f607-4890-a123-456789abcdef";
+    const result = await writeRebuiltRollout({
+      view,
+      cwd: store.cwd,
+      claudeProjectsDir: store.claudeProjectsDir,
+      newSessionId,
+    });
+
+    const lines = parseRolloutLines(NodeFS.readFileSync(result.rolloutPath, "utf8"));
+    assertRolloutInvariants(lines, newSessionId, result.rolloutPath);
+    const serialized = JSON.stringify(lines);
+    expect(serialized).not.toContain("[tool ");
+    expect(serialized).not.toContain("[thinking]");
+
+    const blocks = lines.flatMap((line) =>
+      Array.isArray(line.message?.content) ? line.message.content : [],
+    );
+    expect(blocks.find((b) => b.type === "thinking")).toMatchObject({
+      thinking: "I should run ls.",
+      signature: "",
+    });
+    expect(blocks.find((b) => b.type === "tool_use")).toMatchObject({
+      id: "toolu_e2e_01",
+      name: "Bash",
+      input: { command: "ls" },
+    });
+    expect(blocks.find((b) => b.type === "tool_result")).toMatchObject({
+      tool_use_id: "toolu_e2e_01",
+      content: "a.ts\nb.ts",
+      is_error: false,
+    });
+  });
 });

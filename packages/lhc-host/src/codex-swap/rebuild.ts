@@ -44,20 +44,44 @@ function isRuntimeNoteContent(text: string): boolean {
   return text.trimStart().startsWith(RUNTIME_NOTE_LABEL);
 }
 
-function renderAssistantText(parts: readonly SessionAssistantPart[]): string {
-  const chunks: string[] = [];
-  for (const part of parts) {
-    if (part.type === "text" && part.text !== undefined && part.text !== "") {
-      chunks.push(part.text);
-    } else if (part.type === "thinking" && part.thinking !== undefined && part.thinking !== "") {
-      chunks.push(`[thinking]\n${part.thinking}`);
-    } else if (part.type === "toolCall") {
-      const name = part.toolName ?? "tool";
-      const args = JSON.stringify(part.arguments ?? {});
-      chunks.push(`[tool ${name}]\n${args}`);
-    }
+/**
+ * Native codex response_item for one assistant part, or null for an empty
+ * part. Bracket-label text renderings of tool activity are banned from the
+ * tail (they taught the model to emit "[tool …]" markers before real calls —
+ * the echo failure mode); they belong only to the compacted bands.
+ *
+ * Shapes match what the intake mapper parses back (codex-lhc map.ts) and the
+ * codex rollout format: `function_call` carries `arguments` as a JSON STRING
+ * plus `call_id`; thinking becomes a `reasoning` item with a summary_text
+ * block (the record has no encrypted_content to restore).
+ */
+function assistantPartResponseItem(
+  part: SessionAssistantPart,
+  timestamp: string,
+): CodexRolloutLine | null {
+  if (part.type === "text" && part.text !== undefined && part.text !== "") {
+    return assistantResponseItem(part.text, timestamp);
   }
-  return chunks.join("\n\n");
+  if (part.type === "thinking" && part.thinking !== undefined && part.thinking !== "") {
+    return {
+      timestamp,
+      type: "response_item",
+      payload: { type: "reasoning", summary: [{ type: "summary_text", text: part.thinking }] },
+    };
+  }
+  if (part.type === "toolCall") {
+    return {
+      timestamp,
+      type: "response_item",
+      payload: {
+        type: "function_call",
+        name: part.toolName ?? "tool",
+        arguments: JSON.stringify(part.arguments ?? {}),
+        call_id: part.toolCallId ?? "",
+      },
+    };
+  }
+  return null;
 }
 
 function userResponseItem(text: string, timestamp: string): CodexRolloutLine {
@@ -146,11 +170,16 @@ export function receiptRolloutLines(receiptText: string, timestamp: string): Reb
 /**
  * Map assembled thread-view entries to codex rollout line objects.
  *
- * History is message-only by design: tool results render as plain user text
- * lines, and no function_call / *_output records are ever emitted, so the
- * rebuilt stream can never contain unpaired or fabricated tool records.
- * model_change / thinking_level_change entries are dropped (known-lossy,
- * same as cc-lhc).
+ * The tail re-emits NATIVE records: assistant text as message/output_text,
+ * thinking as `reasoning` items, tool calls as `function_call` and results
+ * as `function_call_output`, paired verbatim by `call_id` (the view carries
+ * both sides from the record, so the rebuilt stream never contains unpaired
+ * or fabricated tool records — the pairing guarantee the earlier
+ * message-only design bought at the cost of bracket-label text the model
+ * then imitated). Only text parts get an `agent_message` UI-replay event;
+ * tool records are context, not chat lines. model_change /
+ * thinking_level_change entries are dropped (codex carries the model in
+ * turn_context lines, not per-item — known-lossy).
  */
 export function buildRolloutLines(input: RebuildRolloutInput): RebuiltRolloutLine[] {
   const clock = input.clock ?? ((): Date => new Date());
@@ -175,19 +204,31 @@ export function buildRolloutLines(input: RebuildRolloutInput): RebuiltRolloutLin
     }
 
     if (entry.role === "toolResult") {
-      const prefix = entry.isError === true ? "[tool error] " : "";
       rebuilt.push({
-        line: userResponseItem(`${prefix}${entry.content}`, nextTimestamp()),
+        line: {
+          timestamp: nextTimestamp(),
+          type: "response_item",
+          payload: {
+            type: "function_call_output",
+            call_id: entry.toolCallId,
+            output: entry.content,
+            ...(entry.isError === true ? { is_error: true } : {}),
+          },
+        },
         kind: "user",
       });
       continue;
     }
 
     if (entry.role === "assistant") {
-      const text = renderAssistantText(entry.content);
-      if (text === "") continue;
-      rebuilt.push({ line: assistantResponseItem(text, nextTimestamp()), kind: "assistant" });
-      rebuilt.push({ line: agentMessageEvent(text, nextTimestamp()), kind: "event" });
+      for (const part of entry.content) {
+        const line = assistantPartResponseItem(part, nextTimestamp());
+        if (line === null) continue;
+        rebuilt.push({ line, kind: "assistant" });
+        if (part.type === "text" && part.text !== undefined && part.text !== "") {
+          rebuilt.push({ line: agentMessageEvent(part.text, nextTimestamp()), kind: "event" });
+        }
+      }
     }
   }
 

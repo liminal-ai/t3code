@@ -43,7 +43,7 @@ function fixturePath(relativePath: string): string {
 }
 
 describe("buildRolloutLines", () => {
-  it("maps view entries to uuid-linked rollout lines with envelope fields", () => {
+  it("maps view entries to uuid-linked NATIVE rollout lines (one block per line, shared message id)", () => {
     const sessionId = "new-session-id";
     const lines = buildRolloutLines({
       entries: sampleEntries,
@@ -57,10 +57,12 @@ describe("buildRolloutLines", () => {
       },
     });
 
-    expect(lines).toHaveLength(3);
+    // assistant entry expands to one line per part: [user, thinking, text, toolResult]
+    expect(lines).toHaveLength(4);
     expect(lines[0]?.line.parentUuid).toBeNull();
     expect(lines[1]?.line.parentUuid).toBe(lines[0]?.line.uuid);
     expect(lines[2]?.line.parentUuid).toBe(lines[1]?.line.uuid);
+    expect(lines[3]?.line.parentUuid).toBe(lines[2]?.line.uuid);
     for (const entry of lines) {
       expect(entry.line.sessionId).toBe(sessionId);
       expect(entry.line.session_id).toBe(sessionId);
@@ -70,18 +72,84 @@ describe("buildRolloutLines", () => {
     }
     expect(lines[0]?.line.type).toBe("user");
     expect(lines[0]?.line.message?.content).toBe("hello");
+
+    // native per-block assistant lines: thinking then text, no bracket labels
     expect(lines[1]?.line.type).toBe("assistant");
     expect(lines[1]?.line.message).toMatchObject({
       role: "assistant",
       type: "message",
       model: "claude-opus-4-6",
       stop_reason: "end_turn",
-      content: [{ type: "text", text: "[thinking]\nhmm\n\nhi there" }],
+      content: [{ type: "thinking", thinking: "hmm", signature: "" }],
     });
-    expect(typeof lines[1]?.line.message?.id).toBe("string");
+    expect(lines[2]?.line.type).toBe("assistant");
+    expect(lines[2]?.line.message).toMatchObject({
+      content: [{ type: "text", text: "hi there" }],
+    });
+    // both lines of the entry share one synthetic API message id
     expect(String(lines[1]?.line.message?.id)).toMatch(/^msg_/);
-    expect(lines[2]?.line.type).toBe("user");
-    expect(lines[2]?.line.message?.content).toBe("output");
+    expect(lines[2]?.line.message?.id).toBe(lines[1]?.line.message?.id);
+
+    // tool result is a native tool_result block paired by tool_use_id
+    expect(lines[3]?.line.type).toBe("user");
+    expect(lines[3]?.line.message?.content).toEqual([
+      { type: "tool_result", tool_use_id: "tool-1", content: "output", is_error: false },
+    ]);
+  });
+
+  it("emits native tool_use blocks with verbatim id/name/input and stop_reason tool_use", () => {
+    const lines = buildRolloutLines({
+      entries: [
+        {
+          role: "assistant",
+          content: [
+            { type: "text", text: "running it" },
+            {
+              type: "toolCall",
+              toolCallId: "toolu_01AB",
+              toolName: "Bash",
+              arguments: { command: "ls" },
+            },
+          ],
+          sourceMessages: [],
+        },
+      ],
+      newSessionId: "sid",
+      envelope: { cwd: "/w", assistantModel: "claude-opus-4-6" },
+    });
+
+    expect(lines).toHaveLength(2);
+    expect(lines[0]?.line.message?.stop_reason).toBe("tool_use");
+    expect(lines[1]?.line.message).toMatchObject({
+      stop_reason: "tool_use",
+      content: [{ type: "tool_use", id: "toolu_01AB", name: "Bash", input: { command: "ls" } }],
+    });
+    expect(lines[1]?.line.message?.id).toBe(lines[0]?.line.message?.id);
+    // no bracket-label text anywhere in a native rebuild
+    expect(JSON.stringify(lines)).not.toContain("[tool ");
+    expect(JSON.stringify(lines)).not.toContain("[thinking]");
+  });
+
+  it("stamps model_change onto subsequent assistant lines and skips thinking_level_change", () => {
+    const lines = buildRolloutLines({
+      entries: [
+        { role: "assistant", content: [{ type: "text", text: "before" }], sourceMessages: [] },
+        {
+          kind: "model_change",
+          provider: "anthropic",
+          modelId: "claude-fable-5",
+          sourceMessages: [],
+        },
+        { kind: "thinking_level_change", level: "high", sourceMessages: [] },
+        { role: "assistant", content: [{ type: "text", text: "after" }], sourceMessages: [] },
+      ],
+      newSessionId: "sid",
+      envelope: { cwd: "/w", assistantModel: "claude-opus-4-6" },
+    });
+
+    expect(lines).toHaveLength(2);
+    expect(lines[0]?.line.message?.model).toBe("claude-opus-4-6");
+    expect(lines[1]?.line.message?.model).toBe("claude-fable-5");
   });
 
   it("serializes one JSON object per line", () => {
@@ -154,7 +222,8 @@ describe("writeRebuiltRollout", () => {
     });
 
     expect(NodeFS.existsSync(result.rolloutPath)).toBe(true);
-    expect(result.lineCount).toBe(3);
+    // native per-block assistant lines: [user, thinking, text, toolResult]
+    expect(result.lineCount).toBe(4);
     expect(result.rolloutPath).toBe(NodePath.join(projectDir, "rebuilt-session.jsonl"));
 
     const rolloutContent = NodeFS.readFileSync(result.rolloutPath, "utf8");
@@ -162,7 +231,7 @@ describe("writeRebuiltRollout", () => {
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line) as { version?: string; message?: { content?: string } });
-    expect(parsedLines).toHaveLength(3);
+    expect(parsedLines).toHaveLength(4);
     expect(parsedLines[0]?.version).toBe("2.1.201");
     expect(parsedLines[0]?.message?.content).toBe("hello");
     expect(
@@ -189,11 +258,11 @@ describe("writeRebuiltRollout", () => {
     });
 
     // The receipt line is part of the rebuilt file, so it counts as a replayed line.
-    expect(result.lineCount).toBe(4);
-    expect(result.expectedReintakeLines).toBe(4);
+    expect(result.lineCount).toBe(5);
+    expect(result.expectedReintakeLines).toBe(5);
     // ...but it is NEW history, not served-view replay: the handoff capture
     // must map it (as runtime_note) instead of hard-skipping it as prefix.
-    expect(result.replayedPrefixLines).toBe(3);
+    expect(result.replayedPrefixLines).toBe(4);
 
     const lines = NodeFS.readFileSync(result.rolloutPath, "utf8")
       .trim()
@@ -207,12 +276,12 @@ describe("writeRebuiltRollout", () => {
             message?: { content?: unknown };
           },
       );
-    expect(lines).toHaveLength(4);
-    const receipt = lines[3]!;
+    expect(lines).toHaveLength(5);
+    const receipt = lines[4]!;
     expect(receipt.type).toBe("user");
-    expect(receipt.parentUuid).toBe(lines[2]!.uuid);
+    expect(receipt.parentUuid).toBe(lines[3]!.uuid);
     expect(receipt.message?.content).toBe(
-      "[runtime note] session old-session preserved; resumed in-place as rebuilt-session (expect ~4 replayed lines to re-intake)",
+      "[runtime note] session old-session preserved; resumed in-place as rebuilt-session (expect ~5 replayed lines to re-intake)",
     );
   });
 });

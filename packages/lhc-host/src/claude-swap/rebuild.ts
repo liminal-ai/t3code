@@ -3,7 +3,7 @@ import * as NodeCrypto from "node:crypto";
 
 import type { SessionAssistantPart, SessionThreadViewEntry, SessionThreadViewMessage } from "lhc";
 
-import type { RolloutLineItem } from "./types.ts";
+import type { ContentBlock, RolloutLineItem } from "./types.ts";
 
 export interface RolloutEnvelope {
   cwd: string;
@@ -31,20 +31,38 @@ function isMessageEntry(entry: SessionThreadViewEntry): entry is SessionThreadVi
   return "role" in entry;
 }
 
-function renderAssistantText(parts: readonly SessionAssistantPart[]): string {
-  const chunks: string[] = [];
-  for (const part of parts) {
-    if (part.type === "text" && part.text !== undefined && part.text !== "") {
-      chunks.push(part.text);
-    } else if (part.type === "thinking" && part.thinking !== undefined && part.thinking !== "") {
-      chunks.push(`[thinking]\n${part.thinking}`);
-    } else if (part.type === "toolCall") {
-      const name = part.toolName ?? "tool";
-      const args = JSON.stringify(part.arguments ?? {});
-      chunks.push(`[tool ${name}]\n${args}`);
-    }
+/**
+ * Native content block for one assistant part, or null for an empty part.
+ *
+ * The tail of a rebuilt rollout must be NATIVE blocks, never bracket-labelled
+ * text: text renderings of tool activity taught the model to emit "[tool …]"
+ * markers before real tool calls (pi-lhc's "echo failure mode", reproduced
+ * live in this host after a t3code compact), which the harness then passed
+ * through as user-facing prose. Bracket renderings belong only to the
+ * compacted bands (already lossy summaries, served as user text).
+ *
+ * Thinking signatures are not carried by the thread record, so rebuilt
+ * thinking blocks ship `signature: ""` (a shape real rollout files exhibit) —
+ * the cost is a one-time cache miss, not a format break. Tool ids re-emit
+ * verbatim (`toolCallId` ↔ `tool_use_id`) so calls and results stay paired
+ * exactly as captured.
+ */
+function assistantPartBlock(part: SessionAssistantPart): ContentBlock | null {
+  if (part.type === "text" && part.text !== undefined && part.text !== "") {
+    return { type: "text", text: part.text };
   }
-  return chunks.join("\n\n");
+  if (part.type === "thinking" && part.thinking !== undefined && part.thinking !== "") {
+    return { type: "thinking", thinking: part.thinking, signature: "" };
+  }
+  if (part.type === "toolCall") {
+    return {
+      type: "tool_use",
+      id: part.toolCallId ?? "",
+      name: part.toolName ?? "tool",
+      input: part.arguments ?? {},
+    };
+  }
+  return null;
 }
 
 function syntheticMessageId(lineUuid: string): string {
@@ -80,18 +98,25 @@ function userMessageContent(text: string): { role: "user"; content: string } {
   return { role: "user", content: text };
 }
 
+/**
+ * One native assistant line body carrying a single block. Real rollout files
+ * (verified live on 2.1.x) hold exactly one content block per line, with
+ * consecutive lines of the same API message sharing `message.id` — so the
+ * rebuild emits one line per part under a shared synthetic id.
+ */
 function assistantMessageContent(
-  lineUuid: string,
-  text: string,
-  envelope: RolloutEnvelope,
+  messageId: string,
+  model: string,
+  block: ContentBlock,
+  stopReason: string,
 ): Record<string, unknown> {
   return {
     role: "assistant",
-    id: syntheticMessageId(lineUuid),
+    id: messageId,
     type: "message",
-    model: envelope.assistantModel ?? "unknown",
-    stop_reason: "end_turn",
-    content: [{ type: "text", text }],
+    model,
+    stop_reason: stopReason,
+    content: [block],
   };
 }
 
@@ -127,15 +152,31 @@ export function runtimeNoteRolloutLine(
   return { line, rolloutType: "user" };
 }
 
-/** Map assembled thread-view entries to rollout JSONL line objects (not yet serialized). */
+/**
+ * Map assembled thread-view entries to rollout JSONL line objects (not yet
+ * serialized). Bands arrive as user text entries (already lossy summaries —
+ * bracket labels are correct there); the tail re-emits NATIVE shapes:
+ * per-block assistant lines (thinking / text / tool_use) under a shared
+ * synthetic message id, and tool results as tool_result blocks paired by
+ * tool_use_id. `model_change` entries stamp the model on subsequent
+ * assistant lines (their native representation — rollout files carry no
+ * standalone model-change line); `thinking_level_change` has no rollout
+ * representation and is skipped.
+ */
 export function buildRolloutLines(input: RebuildRolloutInput): RebuiltRolloutLine[] {
   const { entries, newSessionId, envelope } = input;
   const rebuilt: RebuiltRolloutLine[] = [];
   let parentUuid: string | null = null;
   const timestamp = new Date().toISOString();
+  let assistantModel = envelope.assistantModel ?? "unknown";
 
   for (const entry of entries) {
-    if (!isMessageEntry(entry)) continue;
+    if (!isMessageEntry(entry)) {
+      if (entry.kind === "model_change" && entry.modelId !== "") {
+        assistantModel = entry.modelId;
+      }
+      continue;
+    }
 
     if (entry.role === "user") {
       const line = baseEnvelopeFields(newSessionId, parentUuid, envelope, timestamp);
@@ -149,23 +190,45 @@ export function buildRolloutLines(input: RebuildRolloutInput): RebuiltRolloutLin
     if (entry.role === "toolResult") {
       const line = baseEnvelopeFields(newSessionId, parentUuid, envelope, timestamp);
       line.type = "user";
-      const prefix = entry.isError === true ? "[tool error] " : "";
-      line.message = userMessageContent(`${prefix}${entry.content}`);
+      line.message = {
+        role: "user",
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: entry.toolCallId,
+            content: entry.content,
+            is_error: entry.isError === true,
+          },
+        ],
+      };
       parentUuid = typeof line.uuid === "string" ? line.uuid : null;
       rebuilt.push({ line, rolloutType: "user" });
       continue;
     }
 
     if (entry.role === "assistant") {
-      const text = renderAssistantText(entry.content);
-      if (text === "") continue;
-      const line = baseEnvelopeFields(newSessionId, parentUuid, envelope, timestamp);
-      const lineUuid = typeof line.uuid === "string" ? line.uuid : NodeCrypto.randomUUID();
-      line.uuid = lineUuid;
-      line.type = "assistant";
-      line.message = assistantMessageContent(lineUuid, text, envelope);
-      parentUuid = lineUuid;
-      rebuilt.push({ line, rolloutType: "assistant" });
+      const blocks: ContentBlock[] = [];
+      for (const part of entry.content) {
+        const block = assistantPartBlock(part);
+        if (block !== null) blocks.push(block);
+      }
+      if (blocks.length === 0) continue;
+      // One API message across the entry: shared synthetic id, and the
+      // native stop_reason ("tool_use" when the message issues tool calls).
+      const stopReason = blocks.some((block) => block.type === "tool_use")
+        ? "tool_use"
+        : "end_turn";
+      let messageId: string | null = null;
+      for (const block of blocks) {
+        const line = baseEnvelopeFields(newSessionId, parentUuid, envelope, timestamp);
+        const lineUuid = typeof line.uuid === "string" ? line.uuid : NodeCrypto.randomUUID();
+        line.uuid = lineUuid;
+        line.type = "assistant";
+        if (messageId === null) messageId = syntheticMessageId(lineUuid);
+        line.message = assistantMessageContent(messageId, assistantModel, block, stopReason);
+        parentUuid = lineUuid;
+        rebuilt.push({ line, rolloutType: "assistant" });
+      }
     }
   }
 

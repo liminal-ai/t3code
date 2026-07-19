@@ -71,11 +71,13 @@ describe("buildRolloutLines golden shape", () => {
       ["user", "response_item", "user"], // runtime note re-serve, NO user_message event for it
       ["user", "response_item", "user"], // hello codex
       ["event", "event_msg", "user_message"], // first non-note user anchors the replay event
-      ["assistant", "response_item", "assistant"],
-      ["event", "event_msg", "agent_message"],
-      ["user", "response_item", "user"], // tool result as plain user text
-      ["user", "response_item", "user"], // tool error
-      // model_change dropped
+      ["assistant", "response_item", "reasoning"], // thinking part, native reasoning item
+      ["assistant", "response_item", "assistant"], // text part
+      ["event", "event_msg", "agent_message"], // UI-replay event for the text part only
+      ["assistant", "response_item", "function_call"], // tool call, native record
+      ["user", "response_item", "function_call_output"], // tool result, paired by call_id
+      ["user", "response_item", "function_call_output"], // tool error
+      // model_change dropped (codex carries model in turn_context, not per-item)
       ["assistant", "response_item", "assistant"],
       ["event", "event_msg", "agent_message"],
     ]);
@@ -114,22 +116,40 @@ describe("buildRolloutLines golden shape", () => {
     expect(payload.id).toBe(NEW_ID);
   });
 
-  it("renders assistant parts as one output_text and never emits tool records", () => {
+  it("emits native reasoning / function_call / function_call_output records, no bracket labels", () => {
     const lines = build();
-    const assistant = lines.find((entry) => entry.kind === "assistant")!;
-    const content = (assistant.line.payload as { content: Array<{ type: string; text: string }> })
-      .content;
-    expect(content).toEqual([
-      {
-        type: "output_text",
-        text: '[thinking]\npondering\n\nhi there\n\n[tool exec_command]\n{"cmd":"ls"}',
-      },
+    const payloads = lines.map((entry) => entry.line.payload as Record<string, unknown>);
+
+    const reasoning = payloads.find((p) => p.type === "reasoning")!;
+    expect(reasoning).toEqual({
+      type: "reasoning",
+      summary: [{ type: "summary_text", text: "pondering" }],
+    });
+
+    const textItem = payloads.find((p) => p.type === "message" && p.role === "assistant") as {
+      content: Array<{ type: string; text: string }>;
+    };
+    expect(textItem.content).toEqual([{ type: "output_text", text: "hi there" }]);
+
+    const call = payloads.find((p) => p.type === "function_call")!;
+    // codex expects `arguments` as a JSON STRING, paired to its output by call_id
+    expect(call).toEqual({
+      type: "function_call",
+      name: "exec_command",
+      arguments: '{"cmd":"ls"}',
+      call_id: "c1",
+    });
+
+    const outputs = payloads.filter((p) => p.type === "function_call_output");
+    expect(outputs).toEqual([
+      { type: "function_call_output", call_id: "c1", output: "file-a\nfile-b" },
+      { type: "function_call_output", call_id: "c2", output: "boom", is_error: true },
     ]);
-    const types = lines.map((entry) => (entry.line.payload as { type?: string }).type);
-    expect(types).not.toContain("function_call");
-    expect(types).not.toContain("function_call_output");
-    const toolError = lines[7]!.line.payload as { content: Array<{ text: string }> };
-    expect(toolError.content[0]!.text).toBe("[tool error] boom");
+
+    // no bracket-label text anywhere in a native rebuild
+    const serialized = serializeRolloutLines(lines);
+    expect(serialized).not.toContain("[tool ");
+    expect(serialized).not.toContain("[thinking]");
   });
 
   it("keeps timestamps strictly increasing and serializes with trailing newline", () => {

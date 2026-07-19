@@ -338,3 +338,37 @@ launch/completion time. Newest entries at the bottom. Format:
   lane) available; Sol validated on this slice.
 - next: Cursor + Grok swap-feasibility probes (4.0-style, parallel worktrees), then
   ACP capture extension shaped by their verdicts.
+
+## 2026-07-19 — Native-fidelity swap rebuilds (claude + codex) — COMPLETE
+
+- status: done (live compact certification pending — next dogfood session)
+- who: Claude Fable 5 (in-session, dogfooding t3code-lhc itself)
+- why: after a t3code compact, the model imitated the rebuilt tail's "[tool …]"
+  text markers before real tool calls (pi-lhc's "echo failure mode") and the
+  harness passed those calls through as user-facing prose. Same defect was
+  found + fixed today in cc-lhc (sibling repo), certified byte-exact on a real
+  230k session (50-entry tail exact-suffix match, zero noise).
+- what: both rebuilders now emit NATIVE records instead of bracket-label text.
+  claude-swap: one content block per assistant line (thinking/text/tool_use,
+  verbatim id+name+input) under a shared synthetic message id, stop_reason
+  "tool_use" on call lines, tool results as tool_result blocks paired by
+  tool_use_id, model_change stamped onto message.model. codex-swap: reasoning
+  items (summary_text), function_call (arguments as JSON string + call_id),
+  function_call_output paired by call_id — the "message-only by design"
+  doctrine is dead; pairing safety now comes from the view (both sides of
+  every pair are in the record). Capture audit confirmed intake/mapper.ts is
+  NOT the lossy layer (full arguments + fullOutput content, toolCallId-paired).
+- verification: packages/lhc-host/src/verify/transcript-dump.ts — canonical
+  dump serializer (view + claude rollout + codex rollout, stable-sorted-key
+  JSON, intake-identical skip rules) with per-lane faithfulness invariants:
+  dump(buildRolloutLines(view)) === dump(view). Both invariants proven red
+  under mutation (bracket flattening reintroduced → suite fails), plus a
+  tool-heavy end-to-end test through a real initLhc thread. 98 tests green,
+  vp check + typecheck clean.
+- caveats (to certify live): thinking blocks re-emit with signature:"" (not
+  captured; one-time cache miss; resume acceptance unproven for
+  thinking-heavy tails), toolUseResult metadata not reconstructed, codex
+  reasoning-item resume acceptance unprobed.
+- next: full refresh of the dogfood server, then a live compact from the
+  context ring; certify with the dump serializer (before/after tail must be
+  an exact suffix match, like cc-lhc's 2026-07-19 certification).
