@@ -427,3 +427,33 @@ launch/completion time. Newest entries at the bottom. Format:
   green.
 - next: sync-smoke 13/13 report, bounce dogfood server (picks up merge +
   narration/thinking capture fix together), then live compact re-cert.
+
+## 2026-07-20 — Post-bounce capture verification: provider-side fidelity ceiling found
+
+- status: investigation complete; adapter fix verified working within the ceiling
+- what: post-bounce capture check on the live dogfood thread confirmed the
+  ClaudeAdapter fix captures every TEXT block the SDK durably delivers
+  (turn-opening + multi-text messages now recorded). But native SDK logs
+  (~/.t3code/userdata/logs/provider/<t3ThreadId>.log) revealed a
+  provider-side ceiling nothing in our code can fix:
+  (1) MANY of Fable's interim narrations between tool calls arrive with NO
+  text block in the assistant snapshot at all — the message carries only
+  empty thinking blocks + tool_use, and the same messages in the CLI's own
+  rollout file also lack text. The narration exists only ephemerally (if at
+  all) — this is the Fable-specific Claude Code behavior Lee observed and
+  suspected was outside our code. Confirmed: it is.
+  (2) ALL thinking content in the t3code Claude lane is redacted at the
+  source: snapshots carry thinking:"" and thinking_delta events carry
+  {thinking:"", estimated_tokens:N}. Zero assistant_thinking in the record
+  is the lane's reality, not a capture bug. The snapshot thinking-backfill
+  correctly skips empty strings and stays inert; it will work if the lane
+  ever exposes content (cc-lhc's rollout-tailing lane DOES get full signed
+  thinking — 74 blocks in the 234k session — so this is SDK-lane-specific).
+- evidence: assistant-snapshot census across pre/post-bounce native logs
+  (TEXT blocks present for turn-open/wrap-up/some interim; think[0]-only for
+  many interim); rollout block census matches; post-bounce record census
+  (2 text / 28 tool pairs / 0 thinking).
+- implication: LHC fidelity in t3code = full for user prompts, tool
+  calls/results (verbatim), and durable assistant text; narration-shaped
+  output Fable emits as redacted reasoning is unrecoverable at this layer.
+  Worth reporting upstream to Anthropic with the native-log evidence.
