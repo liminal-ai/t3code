@@ -137,6 +137,16 @@ interface ClaudeTurnState {
   readonly assistantTextBlockOrder: Array<AssistantTextBlockState>;
   readonly capturedProposedPlanKeys: Set<string>;
   nextSyntheticAssistantBlockIndex: number;
+  /**
+   * How many text / thinking blocks earlier assistant snapshots in this turn
+   * have already consumed from assistantTextBlockOrder. A turn spans many API
+   * messages whose content-block indexes each restart at 0, so snapshot
+   * backfill must not positionally match a later message's blocks against an
+   * earlier message's (already-completed) entries — that collision silently
+   * dropped every interim narration after a turn's first.
+   */
+  snapshotTextBackfillCursor: number;
+  snapshotReasoningBackfillCursor: number;
 }
 
 interface AssistantTextBlockState {
@@ -1062,6 +1072,34 @@ function extractAssistantTextBlocks(message: SDKMessage): Array<string> {
   return fragments;
 }
 
+function extractAssistantThinkingBlocks(message: SDKMessage): Array<string> {
+  if (message.type !== "assistant") {
+    return [];
+  }
+
+  const content = (message.message as { content?: unknown } | undefined)?.content;
+  if (!Array.isArray(content)) {
+    return [];
+  }
+
+  const fragments: string[] = [];
+  for (const block of content) {
+    if (!block || typeof block !== "object") {
+      continue;
+    }
+    const candidate = block as { type?: unknown; thinking?: unknown };
+    if (
+      candidate.type === "thinking" &&
+      typeof candidate.thinking === "string" &&
+      candidate.thinking.length > 0
+    ) {
+      fragments.push(candidate.thinking);
+    }
+  }
+
+  return fragments;
+}
+
 function extractContentBlockText(block: unknown): string {
   if (!block || typeof block !== "object") {
     return "";
@@ -1518,7 +1556,11 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
   });
 
   const createSyntheticAssistantTextBlock = Effect.fn("createSyntheticAssistantTextBlock")(
-    function* (context: ClaudeSessionContext, fallbackText: string) {
+    function* (
+      context: ClaudeSessionContext,
+      fallbackText: string,
+      kind?: AssistantTextBlockState["kind"],
+    ) {
       const turnState = context.turnState;
       if (!turnState) {
         return undefined;
@@ -1527,6 +1569,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       const blockIndex = turnState.nextSyntheticAssistantBlockIndex;
       turnState.nextSyntheticAssistantBlockIndex -= 1;
       return yield* ensureAssistantTextBlock(context, blockIndex, {
+        ...(kind !== undefined ? { kind } : {}),
         fallbackText,
         streamClosed: true,
       });
@@ -1657,31 +1700,40 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     });
   });
 
-  const backfillAssistantTextBlocksFromSnapshot = Effect.fn(
-    "backfillAssistantTextBlocksFromSnapshot",
-  )(function* (context: ClaudeSessionContext, message: SDKMessage) {
+  /**
+   * Backfill one snapshot message's run of same-kind blocks. Positional
+   * matching starts at the turn's per-kind cursor: blocks below the cursor
+   * belong to earlier snapshot messages in this turn (their content-block
+   * indexes restarted at 0), so matching them here would swallow this
+   * message's blocks; blocks at/above it were stream-created for this
+   * message and must be matched — not duplicated as synthetics.
+   */
+  const backfillSnapshotBlockRun = Effect.fn("backfillSnapshotBlockRun")(function* (
+    context: ClaudeSessionContext,
+    message: SDKMessage,
+    run: { kind: AssistantTextBlockState["kind"]; texts: ReadonlyArray<string> },
+  ) {
     const turnState = context.turnState;
-    if (!turnState) {
-      return;
-    }
-
-    const snapshotTextBlocks = extractAssistantTextBlocks(message);
-    if (snapshotTextBlocks.length === 0) {
+    if (!turnState || run.texts.length === 0) {
       return;
     }
 
     const orderedBlocks = turnState.assistantTextBlockOrder
-      .filter((block) => block.kind === "assistant_message")
+      .filter((block) => block.kind === run.kind)
       .map((block) => ({
         blockIndex: block.blockIndex,
         block,
       }));
+    const cursor =
+      run.kind === "reasoning"
+        ? turnState.snapshotReasoningBackfillCursor
+        : turnState.snapshotTextBackfillCursor;
 
-    for (const [position, text] of snapshotTextBlocks.entries()) {
-      const existingEntry = orderedBlocks[position];
+    for (const [position, text] of run.texts.entries()) {
+      const existingEntry = orderedBlocks[cursor + position];
       const entry =
         existingEntry ??
-        (yield* createSyntheticAssistantTextBlock(context, text).pipe(
+        (yield* createSyntheticAssistantTextBlock(context, text, run.kind).pipe(
           Effect.map((created) => {
             if (!created) {
               return undefined;
@@ -1705,6 +1757,32 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         });
       }
     }
+
+    if (run.kind === "reasoning") {
+      turnState.snapshotReasoningBackfillCursor = cursor + run.texts.length;
+    } else {
+      turnState.snapshotTextBackfillCursor = cursor + run.texts.length;
+    }
+  });
+
+  const backfillAssistantTextBlocksFromSnapshot = Effect.fn(
+    "backfillAssistantTextBlocksFromSnapshot",
+  )(function* (context: ClaudeSessionContext, message: SDKMessage) {
+    const turnState = context.turnState;
+    if (!turnState) {
+      return;
+    }
+
+    // Reasoning first: thinking precedes text within a real assistant
+    // message, and emission order here is canonical-record order.
+    yield* backfillSnapshotBlockRun(context, message, {
+      kind: "reasoning",
+      texts: extractAssistantThinkingBlocks(message),
+    });
+    yield* backfillSnapshotBlockRun(context, message, {
+      kind: "assistant_message",
+      texts: extractAssistantTextBlocks(message),
+    });
   });
 
   const ensureThreadId = Effect.fn("ensureThreadId")(function* (
@@ -2181,11 +2259,12 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
               });
         if (assistantBlockEntry?.block) {
           assistantBlockEntry.block.emittedTextDelta = true;
-          if (event.delta.type === "thinking_delta") {
-            // Reasoning text is not backfilled from assistant message snapshots
-            // (only text blocks are), so accumulate it for the completed detail.
-            assistantBlockEntry.block.fallbackText += deltaText;
-          }
+          // Accumulate deltas for the completed detail. Completion fires on
+          // content_block_stop — BEFORE the snapshot arrives — so without
+          // accumulation a streamed block's item.completed carries no text,
+          // and capture consumers that ignore content.delta lose the block.
+          // Snapshot backfill only fills fallbackText the stream left empty.
+          assistantBlockEntry.block.fallbackText += deltaText;
         }
         const stamp = yield* makeEventStamp();
         yield* offerRuntimeEvent({
@@ -2606,6 +2685,8 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         assistantTextBlockOrder: [],
         capturedProposedPlanKeys: new Set(),
         nextSyntheticAssistantBlockIndex: -1,
+        snapshotTextBackfillCursor: 0,
+        snapshotReasoningBackfillCursor: 0,
       };
       context.session = {
         ...context.session,
@@ -3830,6 +3911,8 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         assistantTextBlockOrder: [],
         capturedProposedPlanKeys: new Set(),
         nextSyntheticAssistantBlockIndex: -1,
+        snapshotTextBackfillCursor: 0,
+        snapshotReasoningBackfillCursor: 0,
       };
 
       const updatedAt = yield* nowIso;

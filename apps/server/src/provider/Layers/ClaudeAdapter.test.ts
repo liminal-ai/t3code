@@ -1040,6 +1040,227 @@ describe("ClaudeAdapterLive", () => {
     );
   });
 
+  it.effect("captures every interim narration and thinking block across snapshot messages", () => {
+    // A Fable-style turn: several assistant API messages (narrate → tool →
+    // narrate), each snapshot's content-block indexes restarting at 0, with
+    // no stream_events at all. Every narration and thinking block must
+    // surface as its own item.completed — the positional-collision bug ate
+    // all but the turn's first.
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+
+      const runtimeEventsFiber = yield* Stream.take(adapter.streamEvents, 14).pipe(
+        Stream.runCollect,
+        Effect.forkChild,
+      );
+
+      const session = yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        modelSelection: {
+          instanceId: ProviderInstanceId.make("claudeAgent"),
+          model: "claude-fable-5",
+        },
+        runtimeMode: "full-access",
+      });
+
+      yield* adapter.sendTurn({
+        threadId: session.threadId,
+        input: "hello",
+        attachments: [],
+      });
+
+      harness.query.emit({
+        type: "assistant",
+        session_id: "sdk-session-1",
+        uuid: "assistant-1",
+        parent_tool_use_id: null,
+        message: {
+          id: "api-message-1",
+          content: [{ type: "text", text: "First narration." }],
+        },
+      } as unknown as SDKMessage);
+
+      harness.query.emit({
+        type: "assistant",
+        session_id: "sdk-session-1",
+        uuid: "assistant-2",
+        parent_tool_use_id: null,
+        message: {
+          id: "api-message-2",
+          content: [{ type: "text", text: "Second narration." }],
+        },
+      } as unknown as SDKMessage);
+
+      harness.query.emit({
+        type: "assistant",
+        session_id: "sdk-session-1",
+        uuid: "assistant-3",
+        parent_tool_use_id: null,
+        message: {
+          id: "api-message-3",
+          content: [
+            { type: "thinking", thinking: "pondering the third step", signature: "sig" },
+            { type: "text", text: "Third narration." },
+          ],
+        },
+      } as unknown as SDKMessage);
+
+      harness.query.emit({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        errors: [],
+        session_id: "sdk-session-1",
+        uuid: "result-1",
+      } as unknown as SDKMessage);
+
+      const runtimeEvents = Array.from(yield* Fiber.join(runtimeEventsFiber));
+
+      const narrations = runtimeEvents.flatMap((event) =>
+        event.type === "item.completed" &&
+        event.payload.itemType === "assistant_message" &&
+        typeof event.payload.detail === "string"
+          ? [event.payload.detail]
+          : [],
+      );
+      assert.deepEqual(narrations, ["First narration.", "Second narration.", "Third narration."]);
+
+      const reasonings = runtimeEvents.flatMap((event) =>
+        event.type === "item.completed" &&
+        event.payload.itemType === "reasoning" &&
+        typeof event.payload.detail === "string"
+          ? [event.payload.detail]
+          : [],
+      );
+      assert.deepEqual(reasonings, ["pondering the third step"]);
+
+      // Thinking precedes its message's text in canonical-record order.
+      const kinds = runtimeEvents.flatMap((event) =>
+        event.type === "item.completed" ? [event.payload.itemType] : [],
+      );
+      assert.deepEqual(kinds, [
+        "assistant_message",
+        "assistant_message",
+        "reasoning",
+        "assistant_message",
+      ]);
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
+  it.effect("does not duplicate narration when stream events and snapshots overlap", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+
+      const runtimeEventsFiber = yield* Stream.take(adapter.streamEvents, 10).pipe(
+        Stream.runCollect,
+        Effect.forkChild,
+      );
+
+      const session = yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        modelSelection: {
+          instanceId: ProviderInstanceId.make("claudeAgent"),
+          model: "claude-fable-5",
+        },
+        runtimeMode: "full-access",
+      });
+
+      yield* adapter.sendTurn({
+        threadId: session.threadId,
+        input: "hello",
+        attachments: [],
+      });
+
+      // Message 1 arrives via live stream AND as a snapshot: one completion.
+      harness.query.emit({
+        type: "stream_event",
+        session_id: "sdk-session-1",
+        uuid: "stream-0",
+        parent_tool_use_id: null,
+        event: {
+          type: "content_block_start",
+          index: 0,
+          content_block: { type: "text", text: "" },
+        },
+      } as unknown as SDKMessage);
+
+      harness.query.emit({
+        type: "stream_event",
+        session_id: "sdk-session-1",
+        uuid: "stream-1",
+        parent_tool_use_id: null,
+        event: {
+          type: "content_block_delta",
+          index: 0,
+          delta: { type: "text_delta", text: "Streamed narration." },
+        },
+      } as unknown as SDKMessage);
+
+      harness.query.emit({
+        type: "stream_event",
+        session_id: "sdk-session-1",
+        uuid: "stream-2",
+        parent_tool_use_id: null,
+        event: {
+          type: "content_block_stop",
+          index: 0,
+        },
+      } as unknown as SDKMessage);
+
+      harness.query.emit({
+        type: "assistant",
+        session_id: "sdk-session-1",
+        uuid: "assistant-1",
+        parent_tool_use_id: null,
+        message: {
+          id: "api-message-1",
+          content: [{ type: "text", text: "Streamed narration." }],
+        },
+      } as unknown as SDKMessage);
+
+      // Message 2 arrives snapshot-only: its own completion, not swallowed.
+      harness.query.emit({
+        type: "assistant",
+        session_id: "sdk-session-1",
+        uuid: "assistant-2",
+        parent_tool_use_id: null,
+        message: {
+          id: "api-message-2",
+          content: [{ type: "text", text: "Snapshot narration." }],
+        },
+      } as unknown as SDKMessage);
+
+      harness.query.emit({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        errors: [],
+        session_id: "sdk-session-1",
+        uuid: "result-1",
+      } as unknown as SDKMessage);
+
+      const runtimeEvents = Array.from(yield* Fiber.join(runtimeEventsFiber));
+      const narrations = runtimeEvents.flatMap((event) =>
+        event.type === "item.completed" &&
+        event.payload.itemType === "assistant_message" &&
+        typeof event.payload.detail === "string"
+          ? [event.payload.detail]
+          : [],
+      );
+      assert.deepEqual(narrations, ["Streamed narration.", "Snapshot narration."]);
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
   it.effect("steers a running turn instead of opening a new one on mid-turn sendTurn", () => {
     const harness = makeHarness();
     return Effect.gen(function* () {

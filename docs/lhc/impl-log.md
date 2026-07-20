@@ -372,3 +372,37 @@ launch/completion time. Newest entries at the bottom. Format:
 - next: full refresh of the dogfood server, then a live compact from the
   context ring; certify with the dump serializer (before/after tail must be
   an exact suffix match, like cc-lhc's 2026-07-19 certification).
+
+## 2026-07-20 — ClaudeAdapter capture-fidelity fixes (narration + reasoning) — COMPLETE
+
+- status: done (code); live re-certification pending next compact
+- who: Claude Fable 5 (in-session, post-swap — first agent running on its own
+  rebuilt rollout)
+- why: live compact certification (thread c9bd9055, session 7222a38c ->
+  0413a0cd) proved the native rebuild faithful to the record but exposed the
+  record itself as lossy: ~20 of ~30 interim assistant narrations missing
+  (record held ~1 assistant_text per turn) and ZERO assistant_thinking in 23
+  turns. Root causes, all in ClaudeAdapter.ts:
+  (1) snapshot backfill positionally matched a later API message's block 0
+  against an earlier message's already-completed entry in the never-pruned
+  assistantTextBlockOrder — every narration after a turn's first was
+  silently swallowed. Fable narrates between tool calls far more than
+  earlier models, so Fable turns hit this constantly.
+  (2) backfill ignored thinking blocks entirely, and this deployment gets no
+  stream_events -> reasoning never captured.
+  (3) latent: streamed text blocks completed on content_block_stop with no
+  detail (text deltas were never accumulated into fallbackText; the snapshot
+  arrives after completion) -> capture consumers that ignore content.delta
+  lose ALL narration in stream-enabled mode. Found by the new overlap test.
+- what: per-kind snapshot-backfill cursors on ClaudeTurnState scope
+  positional matching to each snapshot message's own run (preserving the
+  within-message stream/snapshot dedup); backfill now handles thinking
+  blocks (reasoning emitted before text, canonical-record order); text
+  deltas accumulate into fallbackText like thinking deltas. Two regression
+  tests: multi-snapshot narration+thinking capture, and stream/snapshot
+  overlap dedup (which failed red against defect 3 before the fix).
+  67/67 adapter tests, 384 provider tests, typecheck + vp check green.
+- note: certifier classes 1-2 (tool-outcome trailer, cd-prefix
+  normalization) remain OPEN decisions; class 3 (this) was the real bug.
+  After server bounce + fresh capture, the next compact's band inputs will
+  include narration and thinking for the first time.
