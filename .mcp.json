@@ -1,5 +1,16 @@
 {
   "mcpServers": {
+    "exa": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "exa-mcp-server@3.2.1",
+        "enabledTools=web_search_exa,web_search_advanced_exa,web_fetch_exa"
+      ],
+      "env": {
+        "EXA_API_KEY": "${EXA_API_KEY}"
+      }
+    },
     "xcodebuildmcp": {
       "command": "npx",
       "args": ["--yes", "xcodebuildmcp@2.6.2", "mcp"],
