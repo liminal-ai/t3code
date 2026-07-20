@@ -14,7 +14,7 @@ import {
   makeClaudeEnvironment,
   resolveClaudeHomePath,
 } from "./ClaudeHome.ts";
-import { deriveClaudeSwapHomePath } from "./ClaudeSwapHome.ts";
+import { deriveClaudeSwapHomePath, deriveClaudeSwapProjectsDir } from "./ClaudeSwapHome.ts";
 
 it.layer(NodeServices.layer)("ClaudeHome", (it) => {
   describe("Claude home resolution", () => {
@@ -83,6 +83,55 @@ it.layer(NodeServices.layer)("ClaudeHome", (it) => {
           );
 
           expect(derived).toBe(NodeFS.realpathSync(realHome));
+        } finally {
+          NodeFS.rmSync(tmp, { recursive: true, force: true });
+        }
+      }),
+    );
+
+    it.effect(
+      "derives default-instance projects dir with home semantics (~/.claude/projects)",
+      () =>
+        Effect.gen(function* () {
+          const tmp = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "claude-swap-projects-"));
+          try {
+            const osHome = NodePath.join(tmp, "os-home");
+            NodeFS.mkdirSync(osHome);
+            const projectsDir = yield* Effect.promise(() =>
+              deriveClaudeSwapProjectsDir({
+                continuationKey: `claude:home:${osHome}`,
+                env: { HOME: osHome },
+                osHomeDir: osHome,
+              }),
+            );
+            expect(projectsDir).toBe(
+              NodePath.join(NodeFS.realpathSync(osHome), ".claude", "projects"),
+            );
+          } finally {
+            NodeFS.rmSync(tmp, { recursive: true, force: true });
+          }
+        }),
+    );
+
+    it.effect("derives custom-instance projects dir with CLAUDE_CONFIG_DIR semantics", () =>
+      Effect.gen(function* () {
+        // Since upstream #4017, a custom homePath is exported as
+        // CLAUDE_CONFIG_DIR: the path IS the config dir, so the CLI writes
+        // rollouts to <configDir>/projects — no ".claude" segment.
+        const tmp = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "claude-swap-configdir-"));
+        try {
+          const osHome = NodePath.join(tmp, "os-home");
+          const configDir = NodePath.join(tmp, "work-claude-config");
+          NodeFS.mkdirSync(osHome);
+          NodeFS.mkdirSync(configDir);
+          const projectsDir = yield* Effect.promise(() =>
+            deriveClaudeSwapProjectsDir({
+              continuationKey: `claude:home:${configDir}`,
+              env: { HOME: osHome },
+              osHomeDir: osHome,
+            }),
+          );
+          expect(projectsDir).toBe(NodePath.join(NodeFS.realpathSync(configDir), "projects"));
         } finally {
           NodeFS.rmSync(tmp, { recursive: true, force: true });
         }

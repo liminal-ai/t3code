@@ -35,3 +35,26 @@ export async function deriveClaudeSwapHomePath({
     resolvedKeyHome === resolvedDefaultHome ? NodePath.resolve(env.HOME ?? osHomeDir) : keyHome;
   return realpath(NodePath.resolve(homeForSdk));
 }
+
+/**
+ * The rollout projects directory for a Claude swap, config-dir aware.
+ *
+ * The continuation key (`claude:home:<path>`) carries `resolveClaudeHomePath`,
+ * which has SPLIT semantics since upstream #4017: an instance with no custom
+ * homePath resolves to the OS home and launches with an untouched env (CLI
+ * writes rollouts under `<home>/.claude/projects`), while a custom homePath
+ * is exported as CLAUDE_CONFIG_DIR — the path IS the config dir, and the CLI
+ * writes rollouts under `<configDir>/projects` with no `.claude` segment.
+ */
+export async function deriveClaudeSwapProjectsDir(
+  input: DeriveClaudeSwapHomePathInput,
+): Promise<string> {
+  const { osHomeDir = NodeOS.homedir() } = input;
+  const resolved = await deriveClaudeSwapHomePath(input);
+
+  const keyHome = readClaudeHomeFromContinuationKey(input.continuationKey) ?? "";
+  const isDefaultHome = NodePath.resolve(keyHome) === NodePath.resolve(osHomeDir);
+  return isDefaultHome
+    ? NodePath.join(resolved, ".claude", "projects")
+    : NodePath.join(resolved, "projects");
+}

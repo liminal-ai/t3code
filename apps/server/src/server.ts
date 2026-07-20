@@ -45,7 +45,10 @@ import {
 } from "./provider/Layers/ProviderService.ts";
 import * as ProviderServiceApi from "./provider/Services/ProviderService.ts";
 import * as ProviderSessionDirectoryApi from "./provider/Services/ProviderSessionDirectory.ts";
-import { deriveClaudeSwapHomePath } from "./provider/Drivers/ClaudeSwapHome.ts";
+import {
+  deriveClaudeSwapHomePath,
+  deriveClaudeSwapProjectsDir,
+} from "./provider/Drivers/ClaudeSwapHome.ts";
 import { deriveCodexSwapHomePath } from "./provider/Drivers/CodexSwapHome.ts";
 import { LhcCaptureService, makeLhcCaptureLayer } from "@t3tools/lhc-host/server-layer";
 import {
@@ -53,7 +56,6 @@ import {
   codexSessionsDirFromHome,
   createClaudeSwapController,
   createCodexSwapController,
-  claudeProjectsDirFromHome,
   persistedCwdFromBindingOrSession,
   type ClaudeActiveSession,
   type ClaudeProviderBinding,
@@ -224,6 +226,9 @@ function makeLhcRouteLayer(method: "GET" | "POST", path: string) {
             const claudeHomePath = await deriveClaudeSwapHomePath({
               continuationKey: info.continuationIdentity.continuationKey,
             });
+            const claudeProjectsDir = await deriveClaudeSwapProjectsDir({
+              continuationKey: info.continuationIdentity.continuationKey,
+            });
             const cwd = persistedCwdFromBindingOrSession({ binding, activeSession });
             if (cwd === undefined) {
               throw new Error("Claude thread has no persisted cwd.");
@@ -231,7 +236,7 @@ function makeLhcRouteLayer(method: "GET" | "POST", path: string) {
             return {
               cwd,
               claudeHomePath,
-              claudeProjectsDir: claudeProjectsDirFromHome(claudeHomePath),
+              claudeProjectsDir,
             };
           },
         },
