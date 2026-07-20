@@ -406,3 +406,24 @@ launch/completion time. Newest entries at the bottom. Format:
   normalization) remain OPEN decisions; class 3 (this) was the real bug.
   After server bounce + fresh capture, the next compact's band inputs will
   include narration and thinking for the first time.
+
+## 2026-07-20 — Phase B: upstream sync (64 commits) + CLAUDE_CONFIG_DIR adaptation
+
+- status: merge + patch committed; sync-smoke running
+- who: Claude Fable 5 (in-session)
+- what: merged upstream/main 2640e6dcf (64 commits: mobile showcase, file
+  explorer mentions, draft hero landing, t3 connect SSH, CLAUDE_CONFIG_DIR
+  isolation, codex mcp-oauth-locks tolerance). ZERO textual conflicts — all
+  7 overlap files auto-merged clean (ChatComposer popover mount survived,
+  verified by grep + web typecheck; lockfile regenerated stable via the
+  CI=true no-frozen-lockfile procedure). ONE semantic break found by
+  pre-merge analysis and patched: upstream #4017 exports custom homePath as
+  CLAUDE_CONFIG_DIR (rollouts at <configDir>/projects) while default
+  instances keep home semantics (<home>/.claude/projects) — swap rollout
+  discovery now derives the right shape from the continuation key
+  (deriveClaudeSwapProjectsDir, regression-tested both ways). Capture-plane
+  contracts verified undrifted (ProviderService, ProviderRuntimeEvent).
+  Gates: 597 provider+lhc-host+server tests green, server+web typecheck
+  green.
+- next: sync-smoke 13/13 report, bounce dogfood server (picks up merge +
+  narration/thinking capture fix together), then live compact re-cert.
