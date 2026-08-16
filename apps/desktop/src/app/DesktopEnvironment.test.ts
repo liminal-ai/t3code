@@ -130,6 +130,44 @@ describe("DesktopEnvironment", () => {
     }),
   );
 
+  it.effect("isolates packaged nightly state and application identity", () =>
+    Effect.gen(function* () {
+      const environment = yield* makeEnvironment({
+        isPackaged: true,
+        appVersion: "0.0.0-nightly.20260816.42",
+      });
+
+      assert.equal(environment.baseDir, "/Users/alice/.t3/nightly");
+      assert.equal(environment.stateDir, "/Users/alice/.t3/nightly/userdata");
+      assert.equal(environment.userDataDirName, "t3code-nightly");
+      assert.equal(environment.legacyUserDataDirName, "T3 Code (Nightly)");
+      assert.equal(environment.appUserModelId, "com.t3tools.t3code.nightly");
+      assert.equal(environment.linuxDesktopEntryName, "t3code-nightly.desktop");
+      assert.equal(environment.linuxWmClass, "t3code-nightly");
+      assert.equal(environment.desktopScheme, "t3code-nightly");
+      assert.equal(
+        environment.linuxUrlHandlerDesktopEntryName,
+        "t3code-nightly-url-handler.desktop",
+      );
+      assert.equal(environment.displayName, "T3 Code (Nightly)");
+    }),
+  );
+
+  it.effect("respects an explicit home override for packaged nightly state", () =>
+    Effect.gen(function* () {
+      const environment = yield* makeEnvironment(
+        {
+          isPackaged: true,
+          appVersion: "0.0.0-nightly.20260816.42",
+        },
+        { T3CODE_HOME: "/tmp/t3-nightly-override" },
+      );
+
+      assert.equal(environment.baseDir, "/tmp/t3-nightly-override");
+      assert.equal(environment.stateDir, "/tmp/t3-nightly-override/userdata");
+    }),
+  );
+
   it.effect("uses a configured app user model id override", () =>
     Effect.gen(function* () {
       const environment = yield* makeEnvironment(

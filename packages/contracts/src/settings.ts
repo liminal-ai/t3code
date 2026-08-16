@@ -4,13 +4,13 @@ import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import { TrimmedNonEmptyString, TrimmedString } from "./baseSchemas.ts";
 import { ThreadEnvMode } from "./environment.ts";
-import {
-  DEFAULT_TEXT_GENERATION_MODEL,
-  DEFAULT_TEXT_GENERATION_REASONING_EFFORT,
-  ProviderOptionSelections,
-} from "./model.ts";
+import { DEFAULT_TEXT_GENERATION_MODEL_BY_PROVIDER, ProviderOptionSelections } from "./model.ts";
 import { ModelSelection } from "./orchestration.ts";
-import { ProviderInstanceConfig, ProviderInstanceId } from "./providerInstance.ts";
+import {
+  ProviderDriverKind,
+  ProviderInstanceConfig,
+  ProviderInstanceId,
+} from "./providerInstance.ts";
 
 // ── Client Settings (local-only) ───────────────────────────────
 
@@ -575,14 +575,11 @@ export const ServerSettings = Schema.Struct({
   textGenerationModelSelection: ModelSelection.pipe(
     Schema.withDecodingDefault(
       Effect.succeed({
-        instanceId: ProviderInstanceId.make("codex"),
-        model: DEFAULT_TEXT_GENERATION_MODEL,
-        options: [
-          {
-            id: "reasoningEffort",
-            value: DEFAULT_TEXT_GENERATION_REASONING_EFFORT,
-          },
-        ],
+        instanceId: ProviderInstanceId.make("claudeAgent"),
+        model:
+          DEFAULT_TEXT_GENERATION_MODEL_BY_PROVIDER[ProviderDriverKind.make("claudeAgent")] ??
+          "claude-haiku-4-5",
+        options: [],
       }),
     ),
   ),

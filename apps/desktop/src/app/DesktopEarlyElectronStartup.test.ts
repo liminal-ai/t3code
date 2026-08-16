@@ -102,6 +102,21 @@ describe("DesktopEarlyElectronStartup", () => {
     assert.equal(preference, "kwallet");
   });
 
+  it("keeps nightly pre-ready state and window identity separate from stable", () => {
+    const options = resolveEarlyLinuxElectronOptions({
+      env: {},
+      appVersion: "0.0.0-nightly.20260816.42",
+      homeDirectory: "/home/user",
+      joinPath,
+      readFileString: (path) => {
+        assert.equal(path, "/home/user/.t3/nightly/userdata/desktop-settings.json");
+        return JSON.stringify({ linuxPasswordStore: "auto" });
+      },
+    });
+
+    assert.equal(options.linuxWmClass, "t3code-nightly");
+  });
+
   it("treats whitespace-only T3CODE_HOME as unconfigured in development", () => {
     const preference = resolveEarlyLinuxPasswordStorePreference({
       env: {

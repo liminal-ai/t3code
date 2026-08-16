@@ -49,10 +49,7 @@ describe("buildDayColumns", () => {
         day: "2026-08-01",
         costUsd: 30,
         totalTokens: 300,
-        byProvider: new Map([
-          ["codex" as const, { costUsd: 10, totalTokens: 100 }],
-          ["claude" as const, { costUsd: 20, totalTokens: 200 }],
-        ]),
+        byProvider: new Map([["claude" as const, { costUsd: 20, totalTokens: 200 }]]),
       },
     ],
     // 2026-08-02 is deliberately absent: a day with no activity.
@@ -68,24 +65,20 @@ describe("buildDayColumns", () => {
   ]);
 
   it("plots each day on its own", () => {
-    expect(buildDayColumns(days, byDay, "cost").map((column) => column.total)).toEqual([30, 0, 5]);
+    expect(buildDayColumns(days, byDay, "cost").map((column) => column.total)).toEqual([20, 0, 5]);
   });
 
   it("reads the requested metric", () => {
     expect(buildDayColumns(days, byDay, "tokens").map((column) => column.total)).toEqual([
-      300, 0, 50,
+      200, 0, 50,
     ]);
   });
 
   it("keeps band values absolute rather than cumulative", () => {
-    // Regression: the bands were once stack offsets, which drew Claude Code
-    // permanently above Codex regardless of which provider spent more.
+    // Regression: chart values are absolute rather than cumulative offsets.
     const [first] = buildDayColumns(days, byDay, "cost");
 
-    expect(first?.bands).toEqual([
-      { provider: "codex", value: 10 },
-      { provider: "claude", value: 20 },
-    ]);
+    expect(first?.bands).toEqual([{ provider: "claude", value: 20 }]);
   });
 
   it("reports the total as the sum of its bands", () => {
@@ -106,7 +99,7 @@ describe("hourly chart columns", () => {
           hourStart: "2026-08-11T09:37:00.000Z",
           costUsd: 4,
           totalTokens: 40,
-          byProvider: new Map([["codex" as const, { costUsd: 4, totalTokens: 40 }]]),
+          byProvider: new Map([["claude" as const, { costUsd: 4, totalTokens: 40 }]]),
         },
       ],
     ]);

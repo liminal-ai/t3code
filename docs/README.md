@@ -3,6 +3,7 @@
 ## Using T3 Code
 
 - [Install and first run](./user/install.md)
+- [Claude-only desktop dogfood](./user/claude-desktop-dogfood.md)
 - [Permission modes](./user/permission-modes.md)
 - [Keyboard shortcuts](./user/keybindings.md)
 - [Organizing threads](./user/thread-sidebar.md)
@@ -42,3 +43,7 @@ policy in [CONTRIBUTING.md](../CONTRIBUTING.md); agent rules in [AGENTS.md](../A
 - [Observability](./operations/observability.md)
 - [Relay observability](./operations/relay-observability.md)
 - [Mobile app store screenshots](./operations/mobile-app-store-screenshots.md)
+
+### Product roadmap
+
+- [Claude-focused desktop host](./roadmap/claude-desktop.md)

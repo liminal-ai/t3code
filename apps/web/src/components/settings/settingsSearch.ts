@@ -27,7 +27,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/general": "General",
   "/settings/appearance": "Appearance",
   "/settings/keybindings": "Keybindings",
-  "/settings/providers": "Providers",
+  "/settings/providers": "Claude",
   "/settings/source-control": "Source Control",
   "/settings/connections": "Connections",
   "/settings/archived": "Archive",
@@ -125,7 +125,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "provider-update-checks",
-    title: "Provider update checks",
+    title: "Claude update checks",
     to: "/settings/general",
   },
   {
@@ -192,7 +192,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "providers",
-    title: "Providers",
+    title: "Claude",
     to: "/settings/providers",
   },
   {

@@ -15,6 +15,7 @@ import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopConfig from "./DesktopConfig.ts";
 import { resolveDesktopBaseDir, resolveDesktopStateDir } from "./DesktopStatePaths.ts";
 import { isNightlyDesktopVersion } from "../updates/updateChannels.ts";
+import { getDesktopScheme } from "../electron/ElectronProtocol.ts";
 
 export interface MakeDesktopEnvironmentInput {
   readonly dirname: string;
@@ -74,6 +75,8 @@ export class DesktopEnvironment extends Context.Service<
     readonly appUserModelId: string;
     readonly linuxDesktopEntryName: string;
     readonly linuxWmClass: string;
+    readonly desktopScheme: string;
+    readonly linuxUrlHandlerDesktopEntryName: string;
     readonly linuxApplicationsDir: string;
     readonly appImagePath: Option.Option<string>;
     readonly userDataDirName: string;
@@ -148,6 +151,7 @@ const make = Effect.fn("desktop.environment.make")(function* (
   const homeDirectory = input.homeDirectory;
   const devServerUrl = config.devServerUrl;
   const isDevelopment = Option.isSome(devServerUrl);
+  const isNightly = !isDevelopment && isNightlyDesktopVersion(input.appVersion);
   const appDataDirectory =
     input.platform === "win32"
       ? Option.getOrElse(config.appDataDirectory, () =>
@@ -156,11 +160,15 @@ const make = Effect.fn("desktop.environment.make")(function* (
       : input.platform === "darwin"
         ? path.join(homeDirectory, "Library", "Application Support")
         : Option.getOrElse(config.xdgConfigHome, () => path.join(homeDirectory, ".config"));
-  const baseDir = resolveDesktopBaseDir({
+  const resolvedBaseDir = resolveDesktopBaseDir({
     homeDirectory,
     joinPath: path.join,
     t3Home: config.t3Home,
   });
+  const baseDir =
+    isNightly && Option.isNone(config.t3Home)
+      ? path.join(resolvedBaseDir, "nightly")
+      : resolvedBaseDir;
   const rootDir = path.resolve(input.dirname, "../../..");
   const appRoot = input.isPackaged ? input.appPath : rootDir;
   const serverRoot =
@@ -178,8 +186,12 @@ const make = Effect.fn("desktop.environment.make")(function* (
     joinPath: path.join,
     t3Home: config.t3Home,
   });
-  const userDataDirName = isDevelopment ? "t3code-dev" : "t3code";
-  const legacyUserDataDirName = isDevelopment ? "T3 Code (Dev)" : "T3 Code (Alpha)";
+  const userDataDirName = isDevelopment ? "t3code-dev" : isNightly ? "t3code-nightly" : "t3code";
+  const legacyUserDataDirName = isDevelopment
+    ? "T3 Code (Dev)"
+    : isNightly
+      ? "T3 Code (Nightly)"
+      : "T3 Code (Alpha)";
   const linuxApplicationsDir = path.join(
     Option.getOrElse(config.xdgDataHome, () => path.join(homeDirectory, ".local", "share")),
     "applications",
@@ -224,10 +236,22 @@ const make = Effect.fn("desktop.environment.make")(function* (
     branding,
     displayName,
     appUserModelId: Option.getOrElse(config.appUserModelIdOverride, () =>
-      isDevelopment ? "com.t3tools.t3code.dev" : "com.t3tools.t3code",
+      isDevelopment
+        ? "com.t3tools.t3code.dev"
+        : isNightly
+          ? "com.t3tools.t3code.nightly"
+          : "com.t3tools.t3code",
     ),
-    linuxDesktopEntryName: isDevelopment ? "t3code-dev.desktop" : "t3code.desktop",
-    linuxWmClass: isDevelopment ? "t3code-dev" : "t3code",
+    linuxDesktopEntryName: isDevelopment
+      ? "t3code-dev.desktop"
+      : isNightly
+        ? "t3code-nightly.desktop"
+        : "t3code.desktop",
+    linuxWmClass: isDevelopment ? "t3code-dev" : isNightly ? "t3code-nightly" : "t3code",
+    desktopScheme: getDesktopScheme(isDevelopment, isNightly),
+    linuxUrlHandlerDesktopEntryName: isNightly
+      ? "t3code-nightly-url-handler.desktop"
+      : "t3code-url-handler.desktop",
     linuxApplicationsDir,
     appImagePath: config.appImagePath,
     userDataDirName,

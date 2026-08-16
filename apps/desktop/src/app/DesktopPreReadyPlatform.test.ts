@@ -16,6 +16,7 @@ const { appendSwitchMock, getSwitchValueMock, hasSwitchMock, registerSchemesMock
 
 vi.mock("electron", () => ({
   app: {
+    getVersion: () => "0.0.22",
     commandLine: {
       appendSwitch: appendSwitchMock,
       getSwitchValue: getSwitchValueMock,

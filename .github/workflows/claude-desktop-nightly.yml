@@ -1,0 +1,129 @@
+name: Claude Desktop macOS ARM64 Dogfood
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: claude-desktop-macos-arm64-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify Claude-only desktop
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+
+      - name: Check formatting and lint
+        run: vp check
+
+      - name: Typecheck
+        run: vp run typecheck
+
+      - name: Test sequentially
+        run: vp run -r --concurrency-limit 1 test
+
+      - name: Build desktop
+        run: vp run build:desktop
+
+      - name: Smoke Electron launch
+        run: vp run test:desktop-smoke
+
+  build-macos-arm64:
+    name: Build macOS Apple Silicon
+    needs: verify
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: |
+            args:
+              - --filter=@t3tools/desktop...
+              - --filter=t3...
+              - --filter=@t3tools/scripts...
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Build unsigned dogfood artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="0.0.0-dogfood.${GITHUB_RUN_NUMBER}"
+          vp run dist:desktop:artifact \
+            --platform mac \
+            --target dmg \
+            --arch arm64 \
+            --build-version "$version" \
+            --verbose
+          printf '%s\n' "$version" > release/VERSION
+
+      - name: Collect and verify release candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dogfood-artifacts
+          shopt -s nullglob
+          dmgs=(release/*.dmg)
+          zips=(release/*.zip)
+          if (( ${#dmgs[@]} != 1 )); then
+            echo "Expected exactly one macOS ARM64 DMG; found ${#dmgs[@]}." >&2
+            exit 1
+          fi
+          if (( ${#zips[@]} != 1 )); then
+            echo "Expected exactly one macOS ARM64 ZIP; found ${#zips[@]}." >&2
+            exit 1
+          fi
+          cp "${dmgs[0]}" "${zips[0]}" release/VERSION dogfood-artifacts/
+          for file in release/*.blockmap release/*.yml; do
+            [[ -e "$file" ]] && cp "$file" dogfood-artifacts/
+          done
+          (
+            cd dogfood-artifacts
+            shasum -a 256 ./* > SHA256SUMS
+            shasum -a 256 -c SHA256SUMS
+            node --input-type=module -e '
+              import { readFile, writeFile } from "node:fs/promises";
+              const version = (await readFile("VERSION", "utf8")).trim();
+              await writeFile("RELEASE-MANIFEST.json", `${JSON.stringify({
+                product: "T3 Code (Claude-only dogfood)",
+                version,
+                sourceCommit: process.env.GITHUB_SHA,
+                platform: "darwin",
+                arch: "arm64",
+                signed: false,
+                notarized: false,
+              }, null, 2)}\n`);
+            '
+            shasum -a 256 RELEASE-MANIFEST.json >> SHA256SUMS
+            shasum -a 256 -c SHA256SUMS
+          )
+
+      - name: Upload immutable release candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: claude-desktop-macos-arm64
+          path: dogfood-artifacts/*
+          if-no-files-found: error
+          retention-days: 14

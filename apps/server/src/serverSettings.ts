@@ -12,8 +12,6 @@
  */
 import {
   DEFAULT_TEXT_GENERATION_MODEL,
-  DEFAULT_TEXT_GENERATION_MODEL_BY_PROVIDER,
-  DEFAULT_MODEL_BY_PROVIDER,
   DEFAULT_SERVER_SETTINGS,
   type ModelSelection,
   type ProviderInstanceConfig,
@@ -46,10 +44,7 @@ import { writeFileStringAtomically } from "./atomicWrite.ts";
 import * as ServerConfig from "./config.ts";
 import { type DeepPartial, deepMerge } from "@t3tools/shared/Struct";
 import { fromJsonStringPretty, fromLenientJson } from "@t3tools/shared/schemaJson";
-import {
-  applyServerSettingsPatch,
-  isModelSelectionProviderEnabled,
-} from "@t3tools/shared/serverSettings";
+import { applyServerSettingsPatch } from "@t3tools/shared/serverSettings";
 import * as ServerSecretStore from "./auth/ServerSecretStore.ts";
 
 export { resolveSourceControlWriterModelSelection } from "@t3tools/shared/serverSettings";
@@ -183,26 +178,27 @@ const ServerSettingsJson = fromLenientJson(ServerSettings);
 const decodeServerSettingsJsonExit = Schema.decodeUnknownExit(ServerSettingsJson);
 
 function resolveTextGenerationProvider(settings: ServerSettings): ServerSettings {
-  return isModelSelectionProviderEnabled(settings, settings.textGenerationModelSelection)
-    ? settings
-    : fallbackTextGenerationProvider(settings);
+  const selectedInstance =
+    settings.providerInstances[settings.textGenerationModelSelection.instanceId];
+  const selectedClaudeEnabled =
+    selectedInstance !== undefined
+      ? selectedInstance.driver === "claudeAgent" && selectedInstance.enabled !== false
+      : settings.textGenerationModelSelection.instanceId ===
+          ProviderInstanceId.make("claudeAgent") && settings.providers.claudeAgent.enabled;
+  return selectedClaudeEnabled ? settings : fallbackTextGenerationProvider(settings);
 }
 
 function fallbackTextGenerationProvider(settings: ServerSettings): ServerSettings {
-  const fallbackEntry = Object.entries(settings.providers).find(([, provider]) => provider.enabled);
-  const fallback = fallbackEntry ? ProviderDriverKind.make(fallbackEntry[0]) : undefined;
-  if (!fallback) {
+  if (!settings.providers.claudeAgent.enabled) {
     return settings;
   }
 
+  const fallback = ProviderDriverKind.make("claudeAgent");
   return {
     ...settings,
     textGenerationModelSelection: {
       instanceId: ProviderInstanceId.make(fallback),
-      model:
-        DEFAULT_TEXT_GENERATION_MODEL_BY_PROVIDER[fallback] ??
-        DEFAULT_MODEL_BY_PROVIDER[fallback] ??
-        DEFAULT_TEXT_GENERATION_MODEL,
+      model: DEFAULT_TEXT_GENERATION_MODEL,
     } satisfies ModelSelection,
   };
 }

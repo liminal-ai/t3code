@@ -1019,6 +1019,46 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
   );
 
+  it.effect("isolates nightly installers from the stable desktop identity", () =>
+    Effect.gen(function* () {
+      const version = "1.2.3-nightly.20260815.1";
+      const macConfig = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        version,
+        false,
+        false,
+        undefined,
+        undefined,
+      );
+      const linuxConfig = yield* createBuildConfig(
+        "linux",
+        "AppImage",
+        version,
+        false,
+        false,
+        undefined,
+        undefined,
+      );
+
+      assert.equal(macConfig.appId, "com.t3tools.t3code.nightly");
+      assert.equal(macConfig.productName, "T3 Code (Nightly)");
+      assert.equal(macConfig.artifactName, "T3-Code-Nightly-${version}-${arch}.${ext}");
+      assert.deepStrictEqual((macConfig.mac as Record<string, unknown>).protocols, [
+        { name: "T3 Code (Nightly)", schemes: ["t3code-nightly"] },
+      ]);
+
+      const linux = linuxConfig.linux as Record<string, unknown>;
+      assert.equal(linux.executableName, "t3code-nightly");
+      assert.deepStrictEqual(linux.protocols, [
+        { name: "T3 Code (Nightly)", schemes: ["t3code-nightly"] },
+      ]);
+      assert.deepStrictEqual(linux.desktop, {
+        entry: { StartupWMClass: "t3code-nightly" },
+      });
+    }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
+  );
+
   it.effect("keeps executable resource editing enabled for unsigned Windows builds", () =>
     Effect.gen(function* () {
       const config = yield* createBuildConfig(

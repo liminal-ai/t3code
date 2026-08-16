@@ -19,10 +19,17 @@ import {
   findLatestProposedPlan,
   hasActionableProposedPlan,
   isLatestTurnSettled,
+  PROVIDER_OPTIONS,
   workEntryIndicatesToolFailure,
   workEntryIndicatesToolNeutralStatus,
   workEntryIndicatesToolSuccess,
 } from "./session-logic";
+
+describe("provider composition", () => {
+  it("exposes only Claude", () => {
+    expect(PROVIDER_OPTIONS).toEqual([{ value: "claudeAgent", label: "Claude", available: true }]);
+  });
+});
 
 let nextActivityId = 0;
 

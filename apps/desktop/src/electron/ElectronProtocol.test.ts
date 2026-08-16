@@ -23,6 +23,12 @@ describe("ElectronProtocol", () => {
     unhandleMock.mockReset();
   });
 
+  it("selects separate stable, development, and nightly schemes", () => {
+    assert.equal(ElectronProtocol.getDesktopScheme(false), "t3code");
+    assert.equal(ElectronProtocol.getDesktopScheme(true), "t3code-dev");
+    assert.equal(ElectronProtocol.getDesktopScheme(false, true), "t3code-nightly");
+  });
+
   it.effect("proxies the stable renderer origin to the current app server", () =>
     Effect.gen(function* () {
       let handler: ((request: Request) => Promise<Response>) | undefined;

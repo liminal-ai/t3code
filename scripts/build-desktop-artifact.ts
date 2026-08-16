@@ -2019,6 +2019,22 @@ export function resolveDesktopProductName(version: string): string {
     : (desktopPackageJson.productName ?? "T3 Code");
 }
 
+export function resolveDesktopAppId(version: string): string {
+  return resolveDesktopUpdateChannel(version) === "nightly"
+    ? `${DESKTOP_APP_ID}.nightly`
+    : DESKTOP_APP_ID;
+}
+
+export function resolveDesktopExecutableName(version: string): string {
+  return resolveDesktopUpdateChannel(version) === "nightly" ? "t3code-nightly" : "t3code";
+}
+
+export function resolveDesktopProtocols(version: string): readonly string[] {
+  return resolveDesktopUpdateChannel(version) === "nightly"
+    ? ["t3code-nightly"]
+    : ["t3code", "t3code-dev"];
+}
+
 export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   platform: typeof BuildPlatform.Type,
   target: string,
@@ -2033,10 +2049,17 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       }
     | undefined,
 ) {
+  const updateChannel = resolveDesktopUpdateChannel(version);
+  const isNightly = updateChannel === "nightly";
+  const executableName = resolveDesktopExecutableName(version);
+  const protocols = resolveDesktopProtocols(version);
+  const protocolName = isNightly ? resolveDesktopProductName(version) : "T3 Code";
   const buildConfig: Record<string, unknown> = {
-    appId: DESKTOP_APP_ID,
+    appId: resolveDesktopAppId(version),
     productName: resolveDesktopProductName(version),
-    artifactName: "T3-Code-${version}-${arch}.${ext}",
+    artifactName: isNightly
+      ? "T3-Code-Nightly-${version}-${arch}.${ext}"
+      : "T3-Code-${version}-${arch}.${ext}",
     electronLanguages: [...DESKTOP_ELECTRON_LANGUAGES],
     files: [...DESKTOP_FILE_EXCLUSIONS],
     directories: {
@@ -2051,7 +2074,6 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       ...(platform === "win" ? WINDOWS_SERVER_EXTRA_RESOURCES : []),
     ],
   };
-  const updateChannel = resolveDesktopUpdateChannel(version);
   const publishConfig = yield* resolveGitHubPublishConfig(updateChannel);
   if (publishConfig) {
     buildConfig.publish = [publishConfig];
@@ -2071,8 +2093,8 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       category: "public.app-category.developer-tools",
       protocols: [
         {
-          name: "T3 Code",
-          schemes: ["t3code", "t3code-dev"],
+          name: protocolName,
+          schemes: [...protocols],
         },
       ],
       ...(macPasskeySigning
@@ -2110,7 +2132,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   if (platform === "linux") {
     buildConfig.linux = {
       target: [target],
-      executableName: "t3code",
+      executableName,
       icon: "icons",
       category: "Development",
       // electron-builder turns these into MimeType=x-scheme-handler/<scheme>;
@@ -2118,13 +2140,13 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       // t3code:// OAuth callbacks to the app.
       protocols: [
         {
-          name: "T3 Code",
-          schemes: ["t3code", "t3code-dev"],
+          name: protocolName,
+          schemes: [...protocols],
         },
       ],
       desktop: {
         entry: {
-          StartupWMClass: "t3code",
+          StartupWMClass: executableName,
         },
       },
     };
@@ -2851,6 +2873,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   const macPasskeySigning = configuredMacPasskeySigning
     ? {
         ...configuredMacPasskeySigning,
+        appId: resolveDesktopAppId(appVersion),
         provisioningProfilePath: path.resolve(
           repoRoot,
           configuredMacPasskeySigning.provisioningProfilePath,

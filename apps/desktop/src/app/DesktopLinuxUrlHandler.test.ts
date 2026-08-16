@@ -24,6 +24,8 @@ const makeEnvironment = (overrides: Record<string, unknown> = {}) =>
     isDevelopment: false,
     displayName: "T3 Code (Alpha)",
     linuxWmClass: "t3code",
+    desktopScheme: "t3code",
+    linuxUrlHandlerDesktopEntryName: "t3code-url-handler.desktop",
     linuxApplicationsDir: "/home/alice/.local/share/applications",
     appImagePath: Option.some("/home/alice/Applications/T3-Code.AppImage"),
     path: { join: (...parts: ReadonlyArray<string>) => parts.join("/") },
@@ -172,6 +174,36 @@ describe("DesktopLinuxUrlHandler", () => {
         {
           command: "xdg-mime",
           args: ["default", "t3code-url-handler.desktop", "x-scheme-handler/t3code"],
+        },
+      ]);
+    });
+  });
+
+  it.effect("keeps nightly URL registration separate from stable", () => {
+    const recorded = emptyRecording();
+
+    return Effect.gen(function* () {
+      yield* runRegister(recorded, {
+        environment: {
+          displayName: "T3 Code (Nightly)",
+          desktopScheme: "t3code-nightly",
+          linuxUrlHandlerDesktopEntryName: "t3code-nightly-url-handler.desktop",
+        },
+      });
+
+      assert.equal(
+        recorded.files[0]?.path,
+        "/home/alice/.local/share/applications/t3code-nightly-url-handler.desktop",
+      );
+      assert.include(recorded.files[0]?.content, "MimeType=x-scheme-handler/t3code-nightly;");
+      assert.deepEqual(recorded.commands, [
+        {
+          command: "xdg-mime",
+          args: [
+            "default",
+            "t3code-nightly-url-handler.desktop",
+            "x-scheme-handler/t3code-nightly",
+          ],
         },
       ]);
     });

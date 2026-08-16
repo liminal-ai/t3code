@@ -409,19 +409,6 @@ export function buildTraitsTriggerDisplay(input: {
       fastModeEnabled = descriptor.currentValue === true;
       continue;
     }
-    if (
-      input.provider === "codex" &&
-      descriptor.id === "serviceTier" &&
-      descriptor.type === "select"
-    ) {
-      const currentValue = getProviderOptionCurrentValue(descriptor);
-      const fastTier = descriptor.options.find(({ label }) => label === "Fast");
-      if (fastTier && (currentValue === "default" || currentValue === fastTier.id)) {
-        hasFastMode = true;
-        fastModeEnabled = currentValue === fastTier.id;
-        continue;
-      }
-    }
     const label =
       input.ultrathinkPromptControlled && descriptor.id === input.primarySelectDescriptorId
         ? "Ultrathink"
@@ -497,8 +484,6 @@ export const TraitsPicker = memo(function TraitsPicker({
     </>
   ) : null;
 
-  const isCodexStyle = provider === "codex";
-
   return (
     <Menu
       open={isMenuOpen}
@@ -510,28 +495,13 @@ export const TraitsPicker = memo(function TraitsPicker({
         render={
           <ComposerControl
             variant={triggerVariant ?? "ghost"}
-            className={cn(
-              isCodexStyle
-                ? "min-w-0 max-w-40 shrink justify-start overflow-hidden whitespace-nowrap sm:max-w-48"
-                : "shrink-0 whitespace-nowrap",
-              triggerClassName,
-            )}
+            className={cn("shrink-0 whitespace-nowrap", triggerClassName)}
           />
         }
       >
-        {isCodexStyle ? (
-          <span className="flex min-w-0 w-full items-center gap-1.5 overflow-hidden">
-            {fastModeIcon}
-            <span className="min-w-0 truncate">{triggerLabel}</span>
-            <ComposerControlChevron />
-          </span>
-        ) : (
-          <>
-            {fastModeIcon}
-            <span>{triggerLabel}</span>
-            <ComposerControlChevron />
-          </>
-        )}
+        {fastModeIcon}
+        <span>{triggerLabel}</span>
+        <ComposerControlChevron />
       </MenuTrigger>
       <MenuPopup align="start">
         <TraitsMenuContent

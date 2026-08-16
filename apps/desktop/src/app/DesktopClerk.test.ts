@@ -33,6 +33,7 @@ const makeDesktopClerkLayer = (isDevelopment = true, events: string[] = []) => {
   const environment = DesktopEnvironment.DesktopEnvironment.of({
     stateDir: "/tmp/t3-state",
     isDevelopment,
+    desktopScheme: isDevelopment ? "t3code-dev" : "t3code",
     appDataDirectory: "/tmp/app-data",
     userDataDirName: isDevelopment ? "t3code-dev" : "t3code",
     legacyUserDataDirName: isDevelopment ? "T3 Code (Dev)" : "T3 Code (Alpha)",
@@ -209,26 +210,26 @@ describe("DesktopClerk", () => {
     );
   });
 
-  it.each([
-    { isDevelopment: true, scheme: "t3code-dev" },
-    { isDevelopment: false, scheme: "t3code" },
-  ])("configures the SDK with the $scheme renderer origin", ({ isDevelopment, scheme }) => {
-    const bridge = { cleanup: vi.fn(), isPrimaryInstance: true };
-    storageMock.mockReturnValue(storageAdapter);
-    createClerkBridgeMock.mockReturnValue(bridge);
+  it.each([{ scheme: "t3code-dev" }, { scheme: "t3code" }, { scheme: "t3code-nightly" }])(
+    "configures the SDK with the $scheme renderer origin",
+    ({ scheme }) => {
+      const bridge = { cleanup: vi.fn(), isPrimaryInstance: true };
+      storageMock.mockReturnValue(storageAdapter);
+      createClerkBridgeMock.mockReturnValue(bridge);
 
-    assert.equal(DesktopClerk.createDesktopClerkBridge("/tmp/t3-state", isDevelopment), bridge);
-    assert.deepEqual(storageMock.mock.calls, [[{ path: "/tmp/t3-state" }]]);
-    assert.deepEqual(createClerkBridgeMock.mock.calls, [
-      [
-        {
-          storage: storageAdapter,
-          passkeys: true,
-          renderer: { scheme, host: "app" },
-        },
-      ],
-    ]);
-    storageMock.mockClear();
-    createClerkBridgeMock.mockClear();
-  });
+      assert.equal(DesktopClerk.createDesktopClerkBridge("/tmp/t3-state", scheme), bridge);
+      assert.deepEqual(storageMock.mock.calls, [[{ path: "/tmp/t3-state" }]]);
+      assert.deepEqual(createClerkBridgeMock.mock.calls, [
+        [
+          {
+            storage: storageAdapter,
+            passkeys: true,
+            renderer: { scheme, host: "app" },
+          },
+        ],
+      ]);
+      storageMock.mockClear();
+      createClerkBridgeMock.mockClear();
+    },
+  );
 });

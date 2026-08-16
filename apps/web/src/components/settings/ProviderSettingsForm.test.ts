@@ -11,44 +11,44 @@ import {
 
 describe("ProviderSettingsForm helpers", () => {
   it("derives visible provider config fields from the client definition schema", () => {
-    const codex = DRIVER_OPTION_BY_VALUE[ProviderDriverKind.make("codex")];
+    const claude = DRIVER_OPTION_BY_VALUE[ProviderDriverKind.make("claudeAgent")];
 
-    expect(codex).toBeDefined();
-    expect(deriveProviderSettingsFields(codex!).map((field) => field.key)).toEqual([
+    expect(claude).toBeDefined();
+    expect(deriveProviderSettingsFields(claude!).map((field) => field.key)).toEqual([
       "binaryPath",
       "homePath",
-      "shadowHomePath",
       "launchArgs",
     ]);
   });
 
   it("sources labels and descriptions from schema annotations", () => {
-    const opencode = DRIVER_OPTION_BY_VALUE[ProviderDriverKind.make("opencode")];
-    expect(opencode).toBeDefined();
+    const claude = DRIVER_OPTION_BY_VALUE[ProviderDriverKind.make("claudeAgent")];
+    expect(claude).toBeDefined();
 
-    const serverPassword = deriveProviderSettingsFields(opencode!).find(
-      (field) => field.key === "serverPassword",
+    const homePath = deriveProviderSettingsFields(claude!).find(
+      (field) => field.key === "homePath",
     );
 
-    expect(serverPassword).toMatchObject({
-      label: "Server password",
-      description: "Stored in plain text on disk.",
-      control: "password",
+    expect(homePath).toMatchObject({
+      label: "CLAUDE_CONFIG_DIR path",
+      description:
+        "Custom Claude home and config directory. Keeps .claude.json and .claude separate.",
+      control: "text",
     });
   });
 
   it("preserves unknown config keys while omitting empty configurable fields", () => {
-    const opencode = DRIVER_OPTION_BY_VALUE[ProviderDriverKind.make("opencode")];
-    expect(opencode).toBeDefined();
+    const claude = DRIVER_OPTION_BY_VALUE[ProviderDriverKind.make("claudeAgent")];
+    expect(claude).toBeDefined();
 
-    const serverUrl = deriveProviderSettingsFields(opencode!).find(
-      (field) => field.key === "serverUrl",
+    const launchArgs = deriveProviderSettingsFields(claude!).find(
+      (field) => field.key === "launchArgs",
     );
-    expect(serverUrl).toBeDefined();
+    expect(launchArgs).toBeDefined();
 
     const next = nextProviderConfigWithFieldValue(
-      { forkOwned: 1, serverUrl: "http://127.0.0.1:4096" },
-      serverUrl!,
+      { forkOwned: 1, launchArgs: "--chrome" },
+      launchArgs!,
       "",
     );
 

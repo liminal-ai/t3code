@@ -7,10 +7,16 @@ import {
   type ProviderInstanceId,
   type ServerProvider,
 } from "@t3tools/contracts";
+
 import {
   squashAtomCommandFailure,
   type AtomCommandResult,
 } from "@t3tools/client-runtime/state/runtime";
+
+function providerDisplayName(driver: ProviderDriverKind): string {
+  const configured = PROVIDER_DISPLAY_NAMES[driver];
+  return configured ?? `${driver.charAt(0).toUpperCase()}${driver.slice(1)}`;
+}
 
 export type ProviderUpdateCandidate = ServerProvider & {
   readonly versionAdvisory: NonNullable<ServerProvider["versionAdvisory"]> & {
@@ -107,7 +113,7 @@ function dedupeProvidersByInstanceId<T extends ServerProvider>(providers: Readon
 }
 
 function getProviderUpdatedTitle(provider: Pick<ServerProvider, "driver" | "version">): string {
-  const providerName = PROVIDER_DISPLAY_NAMES[provider.driver] ?? provider.driver;
+  const providerName = providerDisplayName(provider.driver);
   return provider.version
     ? `${providerName} updated: ${formatVersion(provider.version)}`
     : `${providerName} updated`;
@@ -122,7 +128,7 @@ function getProviderUpdatedDescription(providerCount: number): string {
 function getProviderFailedUpdateTitle(
   provider: Pick<ServerProvider, "driver" | "versionAdvisory">,
 ): string {
-  const providerName = PROVIDER_DISPLAY_NAMES[provider.driver] ?? provider.driver;
+  const providerName = providerDisplayName(provider.driver);
   const attemptedVersion = provider.versionAdvisory?.latestVersion;
   return attemptedVersion
     ? `${providerName} ${formatVersion(attemptedVersion)} update failed`
@@ -207,9 +213,7 @@ export function providerUpdateCandidateKey(provider: ProviderUpdateCandidate): s
 }
 
 export function formatProviderList(providers: ReadonlyArray<Pick<ServerProvider, "driver">>) {
-  const names = providers.map(
-    (provider) => PROVIDER_DISPLAY_NAMES[provider.driver] ?? provider.driver,
-  );
+  const names = providers.map((provider) => providerDisplayName(provider.driver));
   if (names.length <= 2) {
     return names.join(" and ");
   }
@@ -315,7 +319,7 @@ export function getSingleProviderUpdateProgressToastView(
     providers: [provider],
     providerCount: 1,
   });
-  const providerName = PROVIDER_DISPLAY_NAMES[provider.driver] ?? provider.driver;
+  const providerName = providerDisplayName(provider.driver);
 
   switch (view.phase) {
     case "running":
@@ -413,8 +417,7 @@ export function getProviderUpdateSidebarPillView(
   const activeProviders = dedupedProviders.filter(isProviderUpdateActive);
   if (activeProviders.length > 0) {
     const activeProvider = activeProviders[0]!;
-    const activeProviderName =
-      PROVIDER_DISPLAY_NAMES[activeProvider.driver] ?? activeProvider.driver;
+    const activeProviderName = providerDisplayName(activeProvider.driver);
     return {
       key: `loading:${activeProviders
         .map((provider) => `${provider.driver}:${provider.updateState?.status ?? "idle"}`)
@@ -465,8 +468,7 @@ export function getProviderUpdateSidebarPillView(
   );
   if (unchangedProviders.length > 0) {
     const unchangedProvider = unchangedProviders[0]!;
-    const unchangedProviderName =
-      PROVIDER_DISPLAY_NAMES[unchangedProvider.driver] ?? unchangedProvider.driver;
+    const unchangedProviderName = providerDisplayName(unchangedProvider.driver);
     terminalCandidates.push({
       key: `unchanged:${unchangedProviders
         .map(
@@ -538,7 +540,7 @@ function getProviderUpdateInitialToastTitle(
 ): string {
   if (providers.length === 1) {
     const provider = providers[0]!;
-    const providerName = PROVIDER_DISPLAY_NAMES[provider.driver] ?? provider.driver;
+    const providerName = providerDisplayName(provider.driver);
     return `Update Available: ${providerName} ${formatVersion(provider.versionAdvisory.latestVersion)}`;
   }
   return `Updates Available: ${providers.length} providers`;
@@ -776,9 +778,7 @@ export interface ProviderUpdateRowStatus {
 }
 
 function environmentProviderNames(group: LocalEnvironmentUpdateGroup): string {
-  return group.candidates
-    .map((candidate) => PROVIDER_DISPLAY_NAMES[candidate.driver] ?? candidate.driver)
-    .join(", ");
+  return group.candidates.map((candidate) => providerDisplayName(candidate.driver)).join(", ");
 }
 
 /**

@@ -11,9 +11,14 @@ import * as Electron from "electron";
 export const DESKTOP_HOST = "app";
 export const DESKTOP_PRODUCTION_SCHEME = "t3code";
 export const DESKTOP_DEVELOPMENT_SCHEME = "t3code-dev";
+export const DESKTOP_NIGHTLY_SCHEME = "t3code-nightly";
 
-export function getDesktopScheme(isDevelopment: boolean): string {
-  return isDevelopment ? DESKTOP_DEVELOPMENT_SCHEME : DESKTOP_PRODUCTION_SCHEME;
+export function getDesktopScheme(isDevelopment: boolean, isNightly = false): string {
+  return isDevelopment
+    ? DESKTOP_DEVELOPMENT_SCHEME
+    : isNightly
+      ? DESKTOP_NIGHTLY_SCHEME
+      : DESKTOP_PRODUCTION_SCHEME;
 }
 
 export function getDesktopOrigin(isDevelopment: boolean): string {
@@ -121,6 +126,15 @@ export function registerDesktopSchemePrivilegesSync(): void {
     },
     {
       scheme: DESKTOP_DEVELOPMENT_SCHEME,
+      privileges: {
+        standard: true,
+        secure: true,
+        supportFetchAPI: true,
+        corsEnabled: true,
+      },
+    },
+    {
+      scheme: DESKTOP_NIGHTLY_SCHEME,
       privileges: {
         standard: true,
         secure: true,

@@ -114,11 +114,11 @@ describe("ClientSettings sidebar", () => {
 });
 
 describe("ServerSettings.providerInstances (slice-2 invariant)", () => {
-  it("defaults text generation to Luna at low reasoning effort", () => {
+  it("defaults text generation to Claude Haiku", () => {
     expect(DEFAULT_SERVER_SETTINGS.textGenerationModelSelection).toEqual({
-      instanceId: ProviderInstanceId.make("codex"),
-      model: "gpt-5.6-luna",
-      options: [{ id: "reasoningEffort", value: "low" }],
+      instanceId: ProviderInstanceId.make("claudeAgent"),
+      model: "claude-haiku-4-5",
+      options: [],
     });
   });
 

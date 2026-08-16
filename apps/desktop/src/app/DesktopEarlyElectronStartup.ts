@@ -14,12 +14,14 @@ import {
   resolveDesktopStateDir,
   type JoinPath,
 } from "./DesktopStatePaths.ts";
+import { isNightlyDesktopVersion } from "../updates/updateChannels.ts";
 
 interface EarlyDesktopSettingsInput {
   readonly env: NodeJS.ProcessEnv;
   readonly homeDirectory: string;
   readonly joinPath: JoinPath;
   readonly readFileString: (path: string) => string;
+  readonly appVersion?: string;
 }
 
 type EarlyLinuxElectronOptionsInput = EarlyDesktopSettingsInput;
@@ -44,17 +46,30 @@ const decodeEarlyDesktopSettingsJson = Schema.decodeSync(EarlyDesktopSettingsJso
 const isDevelopmentEnvironment = (env: NodeJS.ProcessEnv): boolean =>
   trimNonEmpty(env.VITE_DEV_SERVER_URL) !== null;
 
+const isNightlyEnvironment = (input: {
+  readonly env: NodeJS.ProcessEnv;
+  readonly appVersion?: string;
+}): boolean =>
+  !isDevelopmentEnvironment(input.env) &&
+  input.appVersion !== undefined &&
+  isNightlyDesktopVersion(input.appVersion);
+
 function resolveEarlyDesktopSettingsPath(input: {
   readonly env: NodeJS.ProcessEnv;
   readonly homeDirectory: string;
   readonly joinPath: JoinPath;
+  readonly appVersion?: string;
 }): string {
   const t3Home = Option.fromUndefinedOr(input.env.T3CODE_HOME);
-  const baseDir = resolveDesktopBaseDir({
+  const resolvedBaseDir = resolveDesktopBaseDir({
     homeDirectory: input.homeDirectory,
     joinPath: input.joinPath,
     t3Home,
   });
+  const baseDir =
+    isNightlyEnvironment(input) && trimNonEmpty(input.env.T3CODE_HOME) === null
+      ? input.joinPath(resolvedBaseDir, "nightly")
+      : resolvedBaseDir;
   const stateDir = resolveDesktopStateDir({
     baseDir,
     isDevelopment: isDevelopmentEnvironment(input.env),
@@ -81,7 +96,11 @@ export function resolveEarlyLinuxElectronOptions(
 ): EarlyLinuxElectronOptions {
   const preference = resolveEarlyLinuxPasswordStorePreference(input);
   return {
-    linuxWmClass: isDevelopmentEnvironment(input.env) ? "t3code-dev" : "t3code",
+    linuxWmClass: isDevelopmentEnvironment(input.env)
+      ? "t3code-dev"
+      : isNightlyEnvironment(input)
+        ? "t3code-nightly"
+        : "t3code",
     passwordStore: resolveLinuxPasswordStoreSwitch({
       preference,
       env: input.env,

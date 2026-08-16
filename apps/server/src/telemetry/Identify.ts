@@ -10,17 +10,11 @@ import * as Schema from "effect/Schema";
 
 import * as ServerConfig from "../config.ts";
 
-const CodexAuthJsonSchema = Schema.Struct({
-  tokens: Schema.Struct({
-    account_id: Schema.String,
-  }),
-});
-
 const ClaudeJsonSchema = Schema.Struct({
   userID: Schema.String,
 });
 
-export const TelemetryIdentitySource = Schema.Literals(["codex", "claude", "anonymous"]);
+export const TelemetryIdentitySource = Schema.Literals(["claude", "anonymous"]);
 export type TelemetryIdentitySource = typeof TelemetryIdentitySource.Type;
 
 export class TelemetryIdentityReadError extends Schema.TaggedErrorClass<TelemetryIdentityReadError>()(
@@ -39,7 +33,7 @@ export class TelemetryIdentityReadError extends Schema.TaggedErrorClass<Telemetr
 export class TelemetryIdentityDecodeError extends Schema.TaggedErrorClass<TelemetryIdentityDecodeError>()(
   "TelemetryIdentityDecodeError",
   {
-    source: Schema.Literals(["codex", "claude"]),
+    source: Schema.Literal("claude"),
     filePath: Schema.String,
     cause: Schema.Defect(),
   },
@@ -95,7 +89,6 @@ type TelemetryIdentityError =
   | TelemetryAnonymousIdPersistenceError
   | TelemetryIdentityHashError;
 
-const decodeCodexAuthJson = Schema.decodeEffect(Schema.fromJsonString(CodexAuthJsonSchema));
 const decodeClaudeJson = Schema.decodeEffect(Schema.fromJsonString(ClaudeJsonSchema));
 
 function isNotFoundError(error: PlatformError.PlatformError): boolean {
@@ -161,31 +154,6 @@ const hash = (source: TelemetryIdentitySource, value: string) =>
     ),
   );
 
-const getCodexAccountId = Effect.fn("TelemetryIdentity.getCodexAccountId")(function* (
-  homeDirectory: string,
-) {
-  const fileSystem = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-
-  const authJsonPath = path.join(homeDirectory, ".codex", "auth.json");
-  const encoded = yield* readIdentityFile(fileSystem, "codex", authJsonPath);
-  if (Option.isNone(encoded)) {
-    return Option.none<string>();
-  }
-  const authJson = yield* decodeCodexAuthJson(encoded.value).pipe(
-    Effect.mapError(
-      (cause) =>
-        new TelemetryIdentityDecodeError({
-          source: "codex",
-          filePath: authJsonPath,
-          cause,
-        }),
-    ),
-  );
-
-  return Option.some(authJson.tokens.account_id);
-});
-
 const getClaudeUserId = Effect.fn("TelemetryIdentity.getClaudeUserId")(function* (
   homeDirectory: string,
 ) {
@@ -247,24 +215,11 @@ const upsertAnonymousId = Effect.gen(function* () {
 
 /**
  * getTelemetryIdentifier - Users are "identified" by finding the first match of the following, then hashing the value.
- * 1. ~/.codex/auth.json tokens.account_id
- * 2. ~/.claude.json userID
- * 3. ~/.t3/telemetry/anonymous-id
+ * 1. ~/.claude.json userID
+ * 2. ~/.t3/telemetry/anonymous-id
  */
 export const getTelemetryIdentifierForHome = Effect.fn("getTelemetryIdentifierForHome")(
   function* (homeDirectory: string) {
-    const codexAccountId = yield* getCodexAccountId(homeDirectory).pipe(
-      Effect.catchTags({
-        TelemetryIdentityReadError: (error) =>
-          logTelemetryIdentityError(error).pipe(Effect.as(Option.none<string>())),
-        TelemetryIdentityDecodeError: (error) =>
-          logTelemetryIdentityError(error).pipe(Effect.as(Option.none<string>())),
-      }),
-    );
-    if (Option.isSome(codexAccountId)) {
-      return yield* hash("codex", codexAccountId.value);
-    }
-
     const claudeUserId = yield* getClaudeUserId(homeDirectory).pipe(
       Effect.catchTags({
         TelemetryIdentityReadError: (error) =>

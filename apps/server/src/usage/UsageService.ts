@@ -36,7 +36,6 @@ import { HttpClient, HttpClientResponse } from "effect/unstable/http";
 import { ServerConfig } from "../config.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { resolveClaudeHomePath } from "../provider/Drivers/ClaudeHome.ts";
-import { resolveCodexHomeLayout } from "../provider/Drivers/CodexHomeLayout.ts";
 import { UsageAggregator } from "./usageAggregation.ts";
 import { parseRateTable, type RateTable } from "./usagePricing.ts";
 import {
@@ -217,12 +216,7 @@ export const make = Effect.gen(function* () {
 
     const claudeHome = yield* resolveClaudeHomePath(settings.providers.claudeAgent);
     const claudeDir = yield* resolveClaudeTranscriptDir(claudeHome);
-    const codexLayout = yield* resolveCodexHomeLayout(settings.providers.codex);
-
-    return [
-      { provider: "claude" as const, dir: claudeDir },
-      { provider: "codex" as const, dir: path.join(codexLayout.sharedHomePath, "sessions") },
-    ];
+    return [{ provider: "claude" as const, dir: claudeDir }];
   });
 
   /**

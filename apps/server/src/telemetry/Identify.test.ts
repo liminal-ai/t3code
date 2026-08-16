@@ -36,8 +36,8 @@ const findIdentityLog = (
 it("preserves exact telemetry identity causes without deriving messages from them", () => {
   const decodeCause = new Error("private nested decode details");
   const decodeError = new Identify.TelemetryIdentityDecodeError({
-    source: "codex",
-    filePath: "/tmp/auth.json",
+    source: "claude",
+    filePath: "/tmp/.claude.json",
     cause: decodeCause,
   });
   const readCause = new Error("private nested read details");
@@ -77,7 +77,7 @@ it.layer(NodeServices.layer)("telemetry identity", (it) => {
     ),
   );
 
-  it.effect("logs structured decode context and falls back from malformed Codex auth", () => {
+  it.effect("logs structured decode context and falls back from malformed Claude identity", () => {
     const logs: CapturedLog[] = [];
     const logger = makeCaptureLogger(logs);
 
@@ -86,37 +86,34 @@ it.layer(NodeServices.layer)("telemetry identity", (it) => {
       const fileSystem = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const homeDirectory = path.join(config.baseDir, "home");
-      const codexAuthPath = path.join(homeDirectory, ".codex", "auth.json");
+      const claudeIdentityPath = path.join(homeDirectory, ".claude.json");
       const anonymousId = "decode-fallback-anonymous-id";
-      const privateAccessToken = "private-codex-access-token";
+      const privateAccountValue = "private-claude-account-value";
 
-      yield* fileSystem.makeDirectory(path.dirname(codexAuthPath), { recursive: true });
-      yield* fileSystem.writeFileString(
-        codexAuthPath,
-        `{"tokens":{"access_token":"${privateAccessToken}"}}`,
-      );
+      yield* fileSystem.makeDirectory(homeDirectory, { recursive: true });
+      yield* fileSystem.writeFileString(claudeIdentityPath, `{"account":"${privateAccountValue}"}`);
       yield* fileSystem.writeFileString(config.anonymousIdPath, anonymousId);
 
       const identifier = yield* Identify.getTelemetryIdentifierForHome(homeDirectory);
 
       assert.equal(identifier, sha256(anonymousId));
-      const decodeLog = findIdentityLog(logs, "codex", "TelemetryIdentityDecodeError");
+      const decodeLog = findIdentityLog(logs, "claude", "TelemetryIdentityDecodeError");
       assert.isDefined(decodeLog);
       assert.equal(
         decodeLog?.message,
-        `Failed to decode codex telemetry identity at '${codexAuthPath}'.`,
+        `Failed to decode claude telemetry identity at '${claudeIdentityPath}'.`,
       );
 
-      assert.equal(decodeLog?.annotations.filePath, codexAuthPath);
+      assert.equal(decodeLog?.annotations.filePath, claudeIdentityPath);
       assert.equal(decodeLog?.annotations.causeKind, "schema");
       assert.notProperty(decodeLog?.annotations ?? {}, "cause");
       const errorStack = decodeLog?.annotations.errorStack;
       assert.isString(errorStack);
-      assert.include(errorStack, "Failed to decode codex telemetry identity");
+      assert.include(errorStack, "Failed to decode claude telemetry identity");
       const annotations = Object.values(decodeLog?.annotations ?? {})
         .map(String)
         .join("\n");
-      assert.notInclude(annotations, privateAccessToken);
+      assert.notInclude(annotations, privateAccountValue);
     }).pipe(
       Effect.provide(
         Layer.merge(

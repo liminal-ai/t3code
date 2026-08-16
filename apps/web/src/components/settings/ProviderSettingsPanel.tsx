@@ -170,10 +170,10 @@ function EnvironmentUnavailableRow({
 }) {
   const isLoading = access.kind === "loading";
   const title = isLoading
-    ? "Loading provider settings"
+    ? "Loading Claude settings"
     : access.kind === "error"
       ? "Could not connect to this device"
-      : "Provider settings are unavailable";
+      : "Claude settings are unavailable";
   const description = isLoading
     ? access.reason === "permissions"
       ? "Checking what this session is allowed to change."
@@ -182,7 +182,7 @@ function EnvironmentUnavailableRow({
   // No spinner: this state can persist indefinitely for a wedged device, and a
   // continuously repainting animation would run the whole time.
   return (
-    <SettingsSection title="Providers">
+    <SettingsSection title="Claude">
       <SettingsRow title={title} description={description} />
     </SettingsSection>
   );
@@ -222,7 +222,7 @@ export function ProviderSettingsPanel() {
               title={isReady ? "No connected devices" : "Loading devices"}
               description={
                 isReady
-                  ? "Connect an execution environment before configuring providers."
+                  ? "Connect an execution environment before configuring Claude."
                   : "Reading connected execution environments."
               }
             />
@@ -394,14 +394,7 @@ export function EnvironmentProviderSettings({
     () => new Map(providerUpdateCandidates.map((candidate) => [candidate.instanceId, candidate])),
     [providerUpdateCandidates],
   );
-  const visibleProviderSettings = PROVIDER_SETTINGS.filter(
-    (providerSettings) =>
-      providerSettings.provider !== "cursor" ||
-      serverProviders.some(
-        (provider) =>
-          provider.instanceId === defaultInstanceIdForDriver(ProviderDriverKind.make("cursor")),
-      ),
-  );
+  const visibleProviderSettings = PROVIDER_SETTINGS;
   const textGenerationModelSelection = resolveAppModelSelectionState(settings, serverProviders);
   const textGenInstanceId = textGenerationModelSelection.instanceId;
   const resolvedBackgroundActivity = resolveServerBackgroundActivitySettings(settings);
@@ -503,16 +496,7 @@ export function EnvironmentProviderSettings({
     instancesByDriver.set(driver, list);
   }
 
-  const defaultSlotIdsBySource = new Set<string>(
-    visibleProviderSettings.map((providerSettings) =>
-      String(defaultInstanceIdForDriver(providerSettings.provider)),
-    ),
-  );
-
   const rows: InstanceRow[] = [];
-  const visibleDriverKinds = new Set<ProviderDriverKind>(
-    visibleProviderSettings.map((providerSettings) => providerSettings.provider),
-  );
 
   for (const providerSettings of visibleProviderSettings) {
     type LegacyProviderSettings = (typeof settings.providers)[keyof typeof settings.providers];
@@ -556,18 +540,6 @@ export function EnvironmentProviderSettings({
       rows.push({ instanceId: id, instance, driver: instance.driver, isDefault: false });
     }
   }
-  for (const [driver, list] of instancesByDriver) {
-    if (visibleDriverKinds.has(driver)) continue;
-    for (const [id, instance] of list) {
-      rows.push({
-        instanceId: id,
-        instance,
-        driver: instance.driver,
-        isDefault: defaultSlotIdsBySource.has(String(id)),
-      });
-    }
-  }
-
   const updateProviderInstance = (
     row: InstanceRow,
     next: ProviderInstanceConfig,
@@ -673,13 +645,13 @@ export function EnvironmentProviderSettings({
                         size="icon-micro"
                         variant="ghost-muted"
                         onClick={() => setIsAddInstanceDialogOpen(true)}
-                        aria-label="Add provider instance"
+                        aria-label="Add Claude instance"
                       >
                         <PlusIcon className="size-3" />
                       </Button>
                     }
                   />
-                  <TooltipPopup side="top">Add provider instance</TooltipPopup>
+                  <TooltipPopup side="top">Add Claude instance</TooltipPopup>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger
@@ -689,7 +661,7 @@ export function EnvironmentProviderSettings({
                         variant="ghost-muted"
                         disabled={isRefreshingProviders}
                         onClick={() => void refreshProviders()}
-                        aria-label="Refresh provider status"
+                        aria-label="Refresh Claude status"
                       >
                         {isRefreshingProviders ? (
                           <LoaderIcon className="size-3 animate-spin" />
@@ -699,7 +671,7 @@ export function EnvironmentProviderSettings({
                       </Button>
                     }
                   />
-                  <TooltipPopup side="top">Refresh provider status</TooltipPopup>
+                  <TooltipPopup side="top">Refresh Claude status</TooltipPopup>
                 </Tooltip>
               </>
             ) : null}
@@ -709,7 +681,7 @@ export function EnvironmentProviderSettings({
         {readOnly ? (
           <SettingsRow
             title="Limited permissions"
-            description={`This session can view ${environmentLabel}'s providers, but its credential does not allow changing their configuration.`}
+            description={`This session can view ${environmentLabel}'s Claude configuration, but its credential does not allow changing it.`}
           />
         ) : null}
         <div
@@ -726,17 +698,17 @@ export function EnvironmentProviderSettings({
                 Health check interval
                 <PolicyTooltip>
                   This interval is configured here, then the shared Background activity policy
-                  decides whether provider probes may run when the timer fires. Custom intervals
+                  decides whether Claude probes may run when the timer fires. Custom intervals
                   appear as Advanced in General settings.
                 </PolicyTooltip>
               </span>
             }
-            description="Refresh provider availability, versions, auth state, and model metadata in the background. Set this to 0 seconds to rely on manual refreshes."
+            description="Refresh Claude availability, version, authentication state, and model metadata in the background. Set this to 0 seconds to rely on manual refreshes."
             resetAction={
               providerHealthRefreshIntervalSeconds !==
               defaultProviderHealthRefreshIntervalSeconds ? (
                 <SettingResetButton
-                  label="provider health check interval"
+                  label="Claude health check interval"
                   onClick={() =>
                     updateSettings(
                       backgroundActivityOverrideSettings(
@@ -774,9 +746,9 @@ export function EnvironmentProviderSettings({
                   }
                 >
                   <NumberFieldGroup>
-                    <NumberFieldDecrement aria-label="Decrease provider health check interval" />
-                    <NumberFieldInput aria-label="Provider health check interval in seconds" />
-                    <NumberFieldIncrement aria-label="Increase provider health check interval" />
+                    <NumberFieldDecrement aria-label="Decrease Claude health check interval" />
+                    <NumberFieldInput aria-label="Claude health check interval in seconds" />
+                    <NumberFieldIncrement aria-label="Increase Claude health check interval" />
                   </NumberFieldGroup>
                 </NumberField>
                 <span className="text-xs text-muted-foreground">seconds</span>

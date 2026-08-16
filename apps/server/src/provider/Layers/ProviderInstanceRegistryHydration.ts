@@ -73,6 +73,10 @@ import { ProviderInstanceRegistryMutableLayer } from "./ProviderInstanceRegistry
 export const deriveProviderInstanceConfigMap = (
   settings: ServerSettings,
 ): ProviderInstanceConfigMap => {
+  // Preserve configured identities for removed providers. The registry turns
+  // them into unavailable shadows, which keeps historical threads readable
+  // and gives the UI an explicit unsupported-provider status without loading
+  // any removed runtime implementation.
   const merged: Record<string, ProviderInstanceConfig> = { ...settings.providerInstances };
 
   for (const driver of BUILT_IN_DRIVERS) {

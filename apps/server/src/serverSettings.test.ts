@@ -152,10 +152,10 @@ it.layer(NodeServices.layer)("server settings", (it) => {
           },
         },
         textGenerationModelSelection: {
-          instanceId: ProviderInstanceId.make("codex"),
+          instanceId: ProviderInstanceId.make("claudeAgent"),
           model: DEFAULT_SERVER_SETTINGS.textGenerationModelSelection.model,
           options: createModelSelection(
-            ProviderInstanceId.make("codex"),
+            ProviderInstanceId.make("claudeAgent"),
             DEFAULT_SERVER_SETTINGS.textGenerationModelSelection.model,
             [
               { id: "reasoningEffort", value: "high" },
@@ -194,7 +194,7 @@ it.layer(NodeServices.layer)("server settings", (it) => {
       assert.deepEqual(
         next.textGenerationModelSelection,
         createModelSelection(
-          ProviderInstanceId.make("codex"),
+          ProviderInstanceId.make("claudeAgent"),
           DEFAULT_SERVER_SETTINGS.textGenerationModelSelection.model,
           [
             { id: "reasoningEffort", value: "high" },
@@ -228,7 +228,7 @@ it.layer(NodeServices.layer)("server settings", (it) => {
     ).pipe(Effect.provide(makeServerSettingsLayer())),
   );
 
-  it.effect("preserves model when switching providers via textGenerationModelSelection", () =>
+  it.effect("preserves model when switching to a named Claude instance", () =>
     Effect.gen(function* () {
       const serverSettings = yield* ServerSettingsModule.ServerSettingsService;
 
@@ -245,23 +245,26 @@ it.layer(NodeServices.layer)("server settings", (it) => {
         },
       });
 
-      // Switch to Codex — the stale Claude "effort" in options must not
-      // cause the update to lose the selected model.
+      const workInstanceId = ProviderInstanceId.make("claude_work");
       const next = yield* serverSettings.updateSettings({
+        providerInstances: {
+          [workInstanceId]: {
+            driver: ProviderDriverKind.make("claudeAgent"),
+            enabled: true,
+          },
+        },
         textGenerationModelSelection: {
-          instanceId: ProviderInstanceId.make("codex"),
-          model: "gpt-5.4",
-          options: createModelSelection(ProviderInstanceId.make("codex"), "gpt-5.4", [
-            { id: "reasoningEffort", value: "high" },
+          instanceId: workInstanceId,
+          model: "claude-opus-5",
+          options: createModelSelection(workInstanceId, "claude-opus-5", [
+            { id: "effort", value: "high" },
           ]).options!,
         },
       });
 
       assert.deepEqual(
         next.textGenerationModelSelection,
-        createModelSelection(ProviderInstanceId.make("codex"), "gpt-5.4", [
-          { id: "reasoningEffort", value: "high" },
-        ]),
+        createModelSelection(workInstanceId, "claude-opus-5", [{ id: "effort", value: "high" }]),
       );
     }).pipe(Effect.provide(makeServerSettingsLayer())),
   );
@@ -324,7 +327,7 @@ it.layer(NodeServices.layer)("server settings", (it) => {
       }).pipe(Effect.provide(makeServerSettingsLayer())),
   );
 
-  it.effect("preserves enabled text generation selections for non-built-in drivers", () =>
+  it.effect("rejects text generation selections for non-Claude drivers", () =>
     Effect.gen(function* () {
       const serverSettings = yield* ServerSettingsModule.ServerSettingsService;
       const instanceId = ProviderInstanceId.make("openrouter_text");
@@ -344,8 +347,8 @@ it.layer(NodeServices.layer)("server settings", (it) => {
       });
 
       assert.deepEqual(next.textGenerationModelSelection, {
-        instanceId,
-        model: "openai/gpt-5.5",
+        instanceId: ProviderInstanceId.make("claudeAgent"),
+        model: DEFAULT_SERVER_SETTINGS.textGenerationModelSelection.model,
       });
     }).pipe(Effect.provide(makeServerSettingsLayer())),
   );
