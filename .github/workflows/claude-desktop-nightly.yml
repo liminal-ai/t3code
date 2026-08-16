@@ -1,6 +1,9 @@
 name: Claude Desktop macOS ARM64 Dogfood
 
 on:
+  push:
+    branches:
+      - research/claude-desktop-upstream
   workflow_dispatch:
 
 permissions:
