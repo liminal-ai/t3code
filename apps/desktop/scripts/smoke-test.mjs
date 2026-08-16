@@ -28,7 +28,7 @@ child.stderr.on("data", (chunk) => {
 });
 
 const timeout = setTimeout(() => {
-  child.kill();
+  child.kill("SIGKILL");
 }, 8_000);
 
 child.on("exit", () => {

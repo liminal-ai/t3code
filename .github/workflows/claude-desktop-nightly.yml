@@ -42,7 +42,7 @@ jobs:
         run: vp run build:desktop
 
       - name: Smoke Electron launch
-        run: vp run test:desktop-smoke
+        run: timeout 30s xvfb-run -a vp run test:desktop-smoke
 
   build-macos-arm64:
     name: Build macOS Apple Silicon
