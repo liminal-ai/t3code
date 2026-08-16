@@ -73,7 +73,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="0.0.0-dogfood.${GITHUB_RUN_NUMBER}"
+          nightly_date="$(date -u +%Y%m%d)"
+          version="0.0.0-nightly.${nightly_date}.${GITHUB_RUN_NUMBER}"
           vp run dist:desktop:artifact \
             --platform mac \
             --target dmg \
@@ -110,7 +111,7 @@ jobs:
               import { readFile, writeFile } from "node:fs/promises";
               const version = (await readFile("VERSION", "utf8")).trim();
               await writeFile("RELEASE-MANIFEST.json", `${JSON.stringify({
-                product: "T3 Code (Claude-only dogfood)",
+                product: "T3 Code (Nightly, Claude-only dogfood)",
                 version,
                 sourceCommit: process.env.GITHUB_SHA,
                 platform: "darwin",
