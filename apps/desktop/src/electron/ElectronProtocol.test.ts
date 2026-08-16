@@ -3,15 +3,22 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import { beforeEach, vi } from "vite-plus/test";
 
-const { handleMock, netFetchMock, unhandleMock } = vi.hoisted(() => ({
-  handleMock: vi.fn(),
-  netFetchMock: vi.fn(),
-  unhandleMock: vi.fn(),
-}));
+const { handleMock, netFetchMock, registerSchemesAsPrivilegedMock, unhandleMock } = vi.hoisted(
+  () => ({
+    handleMock: vi.fn(),
+    netFetchMock: vi.fn(),
+    registerSchemesAsPrivilegedMock: vi.fn(),
+    unhandleMock: vi.fn(),
+  }),
+);
 
 vi.mock("electron", () => ({
   net: { fetch: netFetchMock },
-  protocol: { handle: handleMock, unhandle: unhandleMock },
+  protocol: {
+    handle: handleMock,
+    registerSchemesAsPrivileged: registerSchemesAsPrivilegedMock,
+    unhandle: unhandleMock,
+  },
 }));
 
 import * as ElectronProtocol from "./ElectronProtocol.ts";
@@ -20,6 +27,7 @@ describe("ElectronProtocol", () => {
   beforeEach(() => {
     handleMock.mockReset();
     netFetchMock.mockReset();
+    registerSchemesAsPrivilegedMock.mockReset();
     unhandleMock.mockReset();
   });
 
@@ -27,6 +35,29 @@ describe("ElectronProtocol", () => {
     assert.equal(ElectronProtocol.getDesktopScheme(false), "t3code");
     assert.equal(ElectronProtocol.getDesktopScheme(true), "t3code-dev");
     assert.equal(ElectronProtocol.getDesktopScheme(false, true), "t3code-nightly");
+    assert.equal(ElectronProtocol.getDesktopScheme(false, false, true), "ccode-long");
+    // Development always wins; CCode Long beats nightly if both were claimed.
+    assert.equal(ElectronProtocol.getDesktopScheme(true, false, true), "t3code-dev");
+    assert.equal(ElectronProtocol.getDesktopScheme(false, true, true), "ccode-long");
+  });
+
+  it("registers every selectable renderer scheme as privileged", () => {
+    ElectronProtocol.registerDesktopSchemePrivilegesSync();
+
+    const registrations = registerSchemesAsPrivilegedMock.mock.calls[0]?.[0];
+    assert.isArray(registrations);
+    assert.deepEqual(
+      registrations.map((registration: { readonly scheme: string }) => registration.scheme),
+      ["t3code", "t3code-dev", "t3code-nightly", "ccode-long"],
+    );
+    for (const registration of registrations) {
+      assert.deepEqual(registration.privileges, {
+        standard: true,
+        secure: true,
+        supportFetchAPI: true,
+        corsEnabled: true,
+      });
+    }
   });
 
   it.effect("proxies the stable renderer origin to the current app server", () =>

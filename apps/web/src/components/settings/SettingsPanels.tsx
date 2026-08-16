@@ -225,6 +225,10 @@ function AboutVersionSection() {
 
   const hasDesktopBridge = typeof window !== "undefined" && Boolean(window.desktopBridge);
   const selectedUpdateChannel = updateState?.channel ?? "latest";
+  // Builds pinned to their own feed (e.g. the ccode-long channel) expose no
+  // track picker: there is nothing valid to switch to.
+  const canChooseUpdateChannel =
+    selectedUpdateChannel === "latest" || selectedUpdateChannel === "nightly";
   const selectedHostedAppChannel = hasDesktopBridge ? null : HOSTED_APP_CHANNEL;
 
   const handleUpdateChannelChange = useCallback(
@@ -386,7 +390,7 @@ function AboutVersionSection() {
           </Tooltip>
         }
       />
-      {hasDesktopBridge ? (
+      {hasDesktopBridge && canChooseUpdateChannel ? (
         <SettingsRow
           title="Update track"
           description="Stable follows full releases. Nightly follows the nightly desktop channel and can switch back to stable immediately."

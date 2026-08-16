@@ -3,7 +3,7 @@
 ## Using T3 Code
 
 - [Install and first run](./user/install.md)
-- [Claude-only desktop dogfood](./user/claude-desktop-dogfood.md)
+- [CCode Long macOS test build](./user/ccode-long-test-build.md)
 - [Permission modes](./user/permission-modes.md)
 - [Keyboard shortcuts](./user/keybindings.md)
 - [Organizing threads](./user/thread-sidebar.md)

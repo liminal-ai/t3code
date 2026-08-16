@@ -120,6 +120,13 @@ describe("DesktopSettings", () => {
     );
   });
 
+  it("defaults CCode Long builds to the ccode-long update channel", () => {
+    assert.equal(
+      DesktopAppSettings.resolveDefaultDesktopSettings("0.0.0-ccode-long.20260816.5").updateChannel,
+      "ccode-long",
+    );
+  });
+
   it.effect("loads persisted settings and applies semantic updates", () =>
     withSettings(
       Effect.gen(function* () {

@@ -31,6 +31,7 @@ interface UpdatesHarnessOptions {
   readonly setDisableDifferentialDownload?: Effect.Effect<void>;
   readonly stopBackend?: Effect.Effect<void>;
   readonly env?: Record<string, string | undefined>;
+  readonly appVersion?: string;
 }
 
 const flushCallbacks = Effect.yieldNow;
@@ -134,7 +135,7 @@ function makeHarness(options: UpdatesHarnessOptions = {}) {
     homeDirectory: `/tmp/t3-desktop-updates-home-${process.pid}`,
     platform: "darwin",
     processArch: "x64",
-    appVersion: "1.2.3",
+    appVersion: options.appVersion ?? "1.2.3",
     appPath: "/repo",
     isPackaged: true,
     resourcesPath: "/missing/resources",
@@ -524,6 +525,33 @@ describe("DesktopUpdates", () => {
         assert.equal(state.channel, "nightly");
         assert.equal(persistedSettings.updateChannel, "nightly");
         assert.equal(persistedSettings.updateChannelConfiguredByUser, true);
+      }),
+    ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
+  });
+
+  it.effect("pins CCode Long builds to their own channel and refuses T3 feeds", () => {
+    const harness = makeHarness({
+      appVersion: "0.0.0-ccode-long.20260816.5",
+      env: { CCODE_LONG_HOME: `/tmp/ccode-long-updates-test-${process.pid}` },
+    });
+
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const updates = yield* DesktopUpdates.DesktopUpdates;
+        yield* updates.configure;
+
+        const state = yield* updates.getState;
+        assert.equal(state.channel, "ccode-long");
+
+        for (const requested of ["nightly", "latest"] as const) {
+          const error = yield* updates.setChannel(requested).pipe(Effect.flip);
+          assert.instanceOf(error, DesktopUpdates.DesktopUpdateChannelLockedError);
+          assert.equal(error.lockedChannel, "ccode-long");
+          assert.equal(error.requestedChannel, requested);
+        }
+        // Re-selecting the pinned channel is a no-op, not an error.
+        const same = yield* updates.setChannel("ccode-long");
+        assert.equal(same.channel, "ccode-long");
       }),
     ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
   });

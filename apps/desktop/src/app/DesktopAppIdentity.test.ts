@@ -156,6 +156,47 @@ describe("DesktopAppIdentity", () => {
     ),
   );
 
+  it.effect("never probes or adopts T3 userData for a CCode Long build", () => {
+    // Fixture: a T3 Code Nightly and Alpha install both exist. The exists()
+    // probe fails on ANY path so that even reading them would surface.
+    const probe = PlatformError.systemError({
+      _tag: "PermissionDenied",
+      module: "FileSystem",
+      method: "exists",
+      description: "legacy path must not be probed",
+      pathOrDescriptor: "/Users/alice/Library/Application Support/T3 Code (Nightly)",
+    });
+
+    return withIdentity(
+      Effect.gen(function* () {
+        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
+        const userDataPath = yield* identity.resolveUserDataPath;
+
+        assert.equal(userDataPath, "/Users/alice/Library/Application Support/ccode-long");
+      }),
+      {
+        environment: { isPackaged: true, appVersion: "0.0.0-ccode-long.20260816.5" },
+        legacyPathExists: true,
+        legacyPathProbeError: probe,
+      },
+    );
+  });
+
+  it.effect("names the CCode Long app so Safe Storage uses its own keychain identity", () => {
+    const calls: ElectronAppCalls = { setAboutPanelOptions: [], setDockIcon: [], setName: [] };
+    return withIdentity(
+      Effect.gen(function* () {
+        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
+        yield* identity.configure;
+        assert.deepStrictEqual(calls.setName, ["CCode Long"]);
+      }),
+      {
+        calls,
+        environment: { isPackaged: true, appVersion: "0.0.0-ccode-long.20260816.5" },
+      },
+    );
+  });
+
   it.effect("preserves failures while inspecting the legacy userData path", () => {
     const legacyPath = "/Users/alice/Library/Application Support/T3 Code (Alpha)";
     const cause = PlatformError.systemError({

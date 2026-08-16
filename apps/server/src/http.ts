@@ -39,10 +39,19 @@ import {
 } from "./auth/http.ts";
 import * as ServerEnvironment from "./environment/ServerEnvironment.ts";
 import { browserApiCorsAllowedHeaders, browserApiCorsAllowedMethods } from "./httpCors.ts";
+import { CCODE_LONG_DESKTOP_IDENTITY } from "@t3tools/shared/desktopProductIdentity";
 
 const OTLP_TRACES_PROXY_PATH = "/api/observability/v1/traces";
 const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "::1", "localhost"]);
-const DESKTOP_RENDERER_ORIGINS = ["t3code://app", "t3code-dev://app", "t3code-nightly://app"];
+// Desktop renderer origins: the T3 Code schemes plus the CCode Long scheme
+// from the shared identity source, so a scheme rename there cannot silently
+// leave the app failing local CORS/origin validation.
+export const DESKTOP_RENDERER_ORIGINS: readonly string[] = [
+  "t3code://app",
+  "t3code-dev://app",
+  "t3code-nightly://app",
+  `${CCODE_LONG_DESKTOP_IDENTITY.scheme}://app`,
+];
 const SVG_CONTENT_SECURITY_POLICY = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
 
 export function assetResponseHeaders(filePath: string): Record<string, string> {

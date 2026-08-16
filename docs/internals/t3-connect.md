@@ -213,8 +213,11 @@ T3CODE_CLERK_PASSKEY_RP_DOMAINS=example.clerk.accounts.dev,clerk.example.com
 ```
 
 When `T3CODE_CLERK_PASSKEY_RP_DOMAINS` is absent, the build derives the RP domain from
-`T3CODE_CLERK_PUBLISHABLE_KEY`. Signed macOS builds fail early if the Team ID, provisioning profile,
-or RP-domain configuration is missing. The generated main-app entitlements include every configured
+`T3CODE_CLERK_PUBLISHABLE_KEY`. Passkey signing is opt-in: once any of `T3CODE_APPLE_TEAM_ID`,
+`T3CODE_MACOS_PROVISIONING_PROFILE`, or `T3CODE_CLERK_PASSKEY_RP_DOMAINS` is set, signed macOS
+builds fail early if the Team ID, provisioning profile, or RP-domain configuration is incomplete.
+With none of them set, a `--signed` build is a plain Developer ID build without passkey
+entitlements. The generated main-app entitlements include every configured
 `webcredentials:<domain>` entry; helper apps keep Electron's minimal default entitlements.
 
 The normal `dev:desktop` launcher is unsigned and cannot complete macOS passkey ceremonies. For

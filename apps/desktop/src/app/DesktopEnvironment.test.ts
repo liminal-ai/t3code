@@ -140,7 +140,7 @@ describe("DesktopEnvironment", () => {
       assert.equal(environment.baseDir, "/Users/alice/.t3/nightly");
       assert.equal(environment.stateDir, "/Users/alice/.t3/nightly/userdata");
       assert.equal(environment.userDataDirName, "t3code-nightly");
-      assert.equal(environment.legacyUserDataDirName, "T3 Code (Nightly)");
+      assert.deepStrictEqual(environment.legacyUserDataDirName, Option.some("T3 Code (Nightly)"));
       assert.equal(environment.appUserModelId, "com.t3tools.t3code.nightly");
       assert.equal(environment.linuxDesktopEntryName, "t3code-nightly.desktop");
       assert.equal(environment.linuxWmClass, "t3code-nightly");
@@ -165,6 +165,55 @@ describe("DesktopEnvironment", () => {
 
       assert.equal(environment.baseDir, "/tmp/t3-nightly-override");
       assert.equal(environment.stateDir, "/tmp/t3-nightly-override/userdata");
+    }),
+  );
+
+  it.effect("gives packaged CCode Long builds their own identity and state, never T3's", () =>
+    Effect.gen(function* () {
+      const environment = yield* makeEnvironment(
+        { isPackaged: true, appVersion: "0.0.0-ccode-long.20260816.5" },
+        // T3CODE_HOME is set on purpose: CCode Long must ignore it.
+        { T3CODE_HOME: "/tmp/t3-home-must-be-ignored" },
+      );
+
+      assert.equal(environment.displayName, "CCode Long");
+      assert.deepStrictEqual(environment.branding, {
+        baseName: "CCode Long",
+        stageLabel: "Test",
+        displayName: "CCode Long",
+      });
+      assert.equal(environment.baseDir, "/Users/alice/.ccode-long");
+      assert.equal(environment.stateDir, "/Users/alice/.ccode-long/userdata");
+      assert.equal(environment.userDataDirName, "ccode-long");
+      assert.deepStrictEqual(environment.legacyUserDataDirName, Option.none());
+      assert.equal(environment.appUserModelId, "ai.liminal.ccodelong");
+      assert.equal(environment.desktopScheme, "ccode-long");
+      assert.equal(environment.linuxDesktopEntryName, "ccode-long.desktop");
+      assert.equal(environment.linuxWmClass, "ccode-long");
+      assert.equal(environment.linuxUrlHandlerDesktopEntryName, "ccode-long-url-handler.desktop");
+      for (const value of [
+        environment.baseDir,
+        environment.stateDir,
+        environment.userDataDirName,
+        environment.appUserModelId,
+        environment.desktopScheme,
+        environment.displayName,
+      ]) {
+        assert.notInclude(value.toLowerCase(), "t3");
+        assert.notInclude(value.toLowerCase(), "nightly");
+      }
+    }),
+  );
+
+  it.effect("honours only CCODE_LONG_HOME as the CCode Long state override", () =>
+    Effect.gen(function* () {
+      const environment = yield* makeEnvironment(
+        { isPackaged: true, appVersion: "0.0.0-ccode-long.20260816.5" },
+        { CCODE_LONG_HOME: " /tmp/ccode-long-home ", T3CODE_HOME: "/tmp/t3-home" },
+      );
+
+      assert.equal(environment.baseDir, "/tmp/ccode-long-home");
+      assert.equal(environment.stateDir, "/tmp/ccode-long-home/userdata");
     }),
   );
 

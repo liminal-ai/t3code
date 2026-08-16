@@ -117,6 +117,34 @@ describe("DesktopEarlyElectronStartup", () => {
     assert.equal(options.linuxWmClass, "t3code-nightly");
   });
 
+  it("keeps CCode Long pre-ready state under its own home and ignores T3CODE_HOME", () => {
+    const options = resolveEarlyLinuxElectronOptions({
+      env: { T3CODE_HOME: "/tmp/t3-home-must-be-ignored" },
+      appVersion: "0.0.0-ccode-long.20260816.5",
+      homeDirectory: "/home/user",
+      joinPath,
+      readFileString: (path) => {
+        assert.equal(path, "/home/user/.ccode-long/userdata/desktop-settings.json");
+        return JSON.stringify({ linuxPasswordStore: "auto" });
+      },
+    });
+
+    assert.equal(options.linuxWmClass, "ccode-long");
+  });
+
+  it("honours CCODE_LONG_HOME for CCode Long pre-ready state", () => {
+    resolveEarlyLinuxElectronOptions({
+      env: { CCODE_LONG_HOME: "/tmp/ccl-home", T3CODE_HOME: "/tmp/t3-home" },
+      appVersion: "0.0.0-ccode-long.20260816.5",
+      homeDirectory: "/home/user",
+      joinPath,
+      readFileString: (path) => {
+        assert.equal(path, "/tmp/ccl-home/userdata/desktop-settings.json");
+        return "{}";
+      },
+    });
+  });
+
   it("treats whitespace-only T3CODE_HOME as unconfigured in development", () => {
     const preference = resolveEarlyLinuxPasswordStorePreference({
       env: {

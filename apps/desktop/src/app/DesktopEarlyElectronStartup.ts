@@ -14,7 +14,8 @@ import {
   resolveDesktopStateDir,
   type JoinPath,
 } from "./DesktopStatePaths.ts";
-import { isNightlyDesktopVersion } from "../updates/updateChannels.ts";
+import { isCCodeLongDesktopVersion, isNightlyDesktopVersion } from "../updates/updateChannels.ts";
+import { CCODE_LONG_DESKTOP_IDENTITY } from "@t3tools/shared/desktopProductIdentity";
 
 interface EarlyDesktopSettingsInput {
   readonly env: NodeJS.ProcessEnv;
@@ -46,11 +47,20 @@ const decodeEarlyDesktopSettingsJson = Schema.decodeSync(EarlyDesktopSettingsJso
 const isDevelopmentEnvironment = (env: NodeJS.ProcessEnv): boolean =>
   trimNonEmpty(env.VITE_DEV_SERVER_URL) !== null;
 
+const isCCodeLongEnvironment = (input: {
+  readonly env: NodeJS.ProcessEnv;
+  readonly appVersion?: string;
+}): boolean =>
+  !isDevelopmentEnvironment(input.env) &&
+  input.appVersion !== undefined &&
+  isCCodeLongDesktopVersion(input.appVersion);
+
 const isNightlyEnvironment = (input: {
   readonly env: NodeJS.ProcessEnv;
   readonly appVersion?: string;
 }): boolean =>
   !isDevelopmentEnvironment(input.env) &&
+  !isCCodeLongEnvironment(input) &&
   input.appVersion !== undefined &&
   isNightlyDesktopVersion(input.appVersion);
 
@@ -60,14 +70,21 @@ function resolveEarlyDesktopSettingsPath(input: {
   readonly joinPath: JoinPath;
   readonly appVersion?: string;
 }): string {
-  const t3Home = Option.fromUndefinedOr(input.env.T3CODE_HOME);
+  // Same product-home rule as DesktopEnvironment: CCode Long reads only its
+  // own override and never T3CODE_HOME.
+  const isCCodeLong = isCCodeLongEnvironment(input);
+  const configuredHomeRaw = isCCodeLong
+    ? input.env[CCODE_LONG_DESKTOP_IDENTITY.homeEnvVar]
+    : input.env.T3CODE_HOME;
+  const t3Home = Option.fromUndefinedOr(configuredHomeRaw);
   const resolvedBaseDir = resolveDesktopBaseDir({
     homeDirectory: input.homeDirectory,
     joinPath: input.joinPath,
     t3Home,
+    ...(isCCodeLong ? { homeDirName: CCODE_LONG_DESKTOP_IDENTITY.homeDirName } : {}),
   });
   const baseDir =
-    isNightlyEnvironment(input) && trimNonEmpty(input.env.T3CODE_HOME) === null
+    isNightlyEnvironment(input) && trimNonEmpty(configuredHomeRaw) === null
       ? input.joinPath(resolvedBaseDir, "nightly")
       : resolvedBaseDir;
   const stateDir = resolveDesktopStateDir({
@@ -98,9 +115,11 @@ export function resolveEarlyLinuxElectronOptions(
   return {
     linuxWmClass: isDevelopmentEnvironment(input.env)
       ? "t3code-dev"
-      : isNightlyEnvironment(input)
-        ? "t3code-nightly"
-        : "t3code",
+      : isCCodeLongEnvironment(input)
+        ? CCODE_LONG_DESKTOP_IDENTITY.executableName
+        : isNightlyEnvironment(input)
+          ? "t3code-nightly"
+          : "t3code",
     passwordStore: resolveLinuxPasswordStoreSwitch({
       preference,
       env: input.env,

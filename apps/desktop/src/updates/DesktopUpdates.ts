@@ -28,7 +28,10 @@ import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as IpcChannels from "../ipc/channels.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import { normalizeDesktopUpdateReleaseNotes } from "./releaseNotes.ts";
-import { resolveDefaultDesktopUpdateChannel } from "./updateChannels.ts";
+import {
+  isDesktopUpdateChannelLocked,
+  resolveDefaultDesktopUpdateChannel,
+} from "./updateChannels.ts";
 import {
   createInitialDesktopUpdateState,
   reduceDesktopUpdateStateOnCheckFailure,
@@ -139,9 +142,22 @@ export class DesktopUpdateUnexpectedActionError extends Schema.TaggedErrorClass<
 
 export type DesktopUpdateConfigureError = never;
 
+export class DesktopUpdateChannelLockedError extends Schema.TaggedErrorClass<DesktopUpdateChannelLockedError>()(
+  "DesktopUpdateChannelLockedError",
+  {
+    lockedChannel: DesktopUpdateChannelSchema,
+    requestedChannel: DesktopUpdateChannelSchema,
+  },
+) {
+  override get message(): string {
+    return `This build is pinned to the ${this.lockedChannel} update channel and cannot switch to ${this.requestedChannel}.`;
+  }
+}
+
 export const DesktopUpdateSetChannelError = Schema.Union([
   DesktopUpdateActionInProgressError,
   DesktopUpdateChannelPersistenceError,
+  DesktopUpdateChannelLockedError,
 ]);
 export type DesktopUpdateSetChannelError = typeof DesktopUpdateSetChannelError.Type;
 export const isDesktopUpdateSetChannelError = Schema.is(DesktopUpdateSetChannelError);
@@ -331,7 +347,7 @@ export const make = Effect.gen(function* () {
     channel: DesktopUpdateChannel,
   ) {
     yield* Effect.annotateCurrentSpan({ channel });
-    const allowsPrerelease = channel === "nightly";
+    const allowsPrerelease = channel === "nightly" || channel === "ccode-long";
     yield* electronUpdater.setChannel(channel);
     yield* electronUpdater.setAllowPrerelease(allowsPrerelease);
     yield* electronUpdater.setAllowDowngrade(allowsPrerelease);
@@ -773,6 +789,15 @@ export const make = Effect.gen(function* () {
       nextChannel: DesktopUpdateChannel,
     ) {
       yield* Effect.annotateCurrentSpan({ channel: nextChannel });
+      // A CCode Long build shares a release repository with T3 Code test
+      // builds; switching feeds would offer the wrong product as an update.
+      const lockedChannel = resolveDefaultDesktopUpdateChannel(environment.appVersion);
+      if (isDesktopUpdateChannelLocked(environment.appVersion) && nextChannel !== lockedChannel) {
+        return yield* new DesktopUpdateChannelLockedError({
+          lockedChannel,
+          requestedChannel: nextChannel,
+        });
+      }
       const activeAction = yield* activeUpdateAction;
       if (Option.isSome(activeAction)) {
         return yield* new DesktopUpdateActionInProgressError({

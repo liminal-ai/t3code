@@ -16,7 +16,7 @@ Build the best cross-platform desktop experience for Claude coding:
 
 The first target user is a developer who uses Claude Code at work and needs a
 self-contained macOS application that installs without administrator access.
-The immediate success criterion is daily dogfood use, not broad market launch.
+The immediate success criterion is daily internal use of test builds, not broad market launch.
 
 ## Product principles
 
@@ -119,7 +119,7 @@ Goal: establish a small, known-good product base before adding LHC.
 - Record exact source revision, toolchain, artifacts, and checksums.
 
 Exit gate: the Claude-only app launches from a clean profile and no known code
-blocker prevents the first real-runtime dogfood.
+blocker prevents the first real-runtime test build.
 
 ## Phase 1: prove the real Claude workflow
 
@@ -161,7 +161,7 @@ Minimum capability:
 - fail closed when a served request or resume projection is invalid;
 - prevent CC-LHC and the desktop host from writing the same thread at once.
 
-The first dogfood build may use isolated LHC state. Existing CC-LHC history
+The first CCode Long test build may use isolated LHC state. Existing CC-LHC history
 must move only through a tested import or explicit ownership-transfer process.
 Never point both products at the same writable database.
 
@@ -240,17 +240,17 @@ Required behavior:
 - settle the agent turn only when the runtime contract says work is complete.
 
 Tests should use receipts and drains rather than sleeps or polling. Packaged
-dogfood must cover a real long-running command, interruption, background
+test builds must cover a real long-running command, interruption, background
 completion, relaunch, and cleanup.
 
-## Phase 6: no-admin macOS dogfood distribution
+## Phase 6: no-admin macOS test-build distribution
 
 Goal: let Lee install and update the product on a managed work Mac without
 administrator privileges or access to missing Nexus packages.
 
 Primary path:
 
-- produce an Apple Silicon artifact in CI for the first dogfood release;
+- produce an Apple Silicon artifact in CI for the first internal release;
 - bundle Electron, application code, JavaScript dependencies, and native
   dependencies;
 - require no runtime npm install, compiler, Xcode, or Homebrew;
@@ -261,7 +261,7 @@ Primary path:
 - verify SHA-256 before installation;
 - preserve user state during update and uninstall;
 - provide explicit install, update, verify, rollback, and uninstall behavior;
-- keep CC-LHC installed as an independent fallback during early dogfood.
+- keep CC-LHC installed as an independent fallback during early internal releases.
 
 Corporate-readiness evidence:
 
@@ -274,10 +274,48 @@ Corporate-readiness evidence:
 - known limitations and support policy;
 - signing and notarization status stated truthfully.
 
-Signing and notarization should be completed before broad macOS distribution.
-They require an Apple Developer identity and notarization credentials. An
-unsigned internal artifact can support controlled dogfood only if the target
-Mac permits it.
+### Product identity
+
+CCode Long registers with macOS as its own application, never as a variant of
+T3 Code. Build and runtime identity both come from one source,
+`packages/shared/src/desktopProductIdentity.ts`, selected by the
+`-ccode-long.YYYYMMDD.N` version discriminator: display name `CCode Long`,
+bundle identifier and AppUserModelId `ai.liminal.ccodelong`, URL and renderer
+scheme `ccode-long`, executable `ccode-long`, artifact prefix `CCode-Long`,
+updater channel `ccode-long`, userData `ccode-long`, and state home
+`~/.ccode-long` (override `CCODE_LONG_HOME`; `T3CODE_HOME` is not honoured).
+A CCode Long build never adopts `T3 Code (Nightly)` or `t3code-nightly`
+userData, `~/.t3` state, the T3 keychain entry, T3 URL registration, the T3
+updater feed, or the T3 single-instance lock, and it does not migrate or
+import T3 data. Its update channel is pinned; the T3 `latest`/`nightly` feeds
+in the same release repository are refused.
+
+### Signing and notarization
+
+Signing and notarization are required for any work-safe release. They require
+a Developer ID Application certificate and App Store Connect notarization
+credentials (`CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_API_KEY`,
+`APPLE_API_KEY_ID`, `APPLE_API_ISSUER`, and the `APPLE_TEAM_ID` variable) in
+the release repository. The CCode Long macOS ARM64 test-release workflow fails
+when they are missing rather than falling back to an unsigned build, verifies
+Developer ID authority, team, hardened runtime, stapled ticket, and `spctl`
+acceptance from both the ZIP and the mounted DMG, and derives the manifest's
+`codeSeal`, `developerIdSigned`, `notarized`, and `approvedFor` values from
+those checks. Passkey (Associated Domains) entitlements and a provisioning
+profile are optional and only apply when that configuration is present.
+
+For personal testing without Apple credentials the workflow can be dispatched
+in `adhoc` mode: the packager applies an ad-hoc code seal (`--adhoc-sign`,
+mutually exclusive with `--signed`), CI verifies `codesign --verify --deep
+--strict` and that the signature is exactly ad hoc from the ZIP and the DMG,
+and the manifest reports `codeSeal: "adhoc"`, `developerIdSigned: false`,
+`notarized: false`, `approvedFor: "personal-test"`. Ad-hoc builds are never
+work-safe and never claim Gatekeeper acceptance.
+
+An unsigned artifact (such as the earlier T3 Code (Nightly)
+`nightly.20260816.3`) is home-only: it is reported as damaged by Gatekeeper
+because the mutated bundle keeps Electron's broken inherited seal, and it must
+not be used on a work Mac. Work Macs must never bypass Gatekeeper.
 
 Fallback source-build path:
 
@@ -292,7 +330,7 @@ Fallback source-build path:
 
 Use two channels:
 
-- **Dogfood:** frequent prereleases for Lee and internal testers.
+- **Test:** frequent prereleases for Lee and internal testers.
 - **Stable:** promotion of an already-tested immutable artifact after lifecycle,
   installation, recovery, and platform gates pass.
 
@@ -354,7 +392,7 @@ vertical slices:
 8. Plan mode, `/goal`, and dynamic workflow parity.
 9. Asynchronous process lifecycle.
 10. No-admin macOS packaging and installer.
-11. Dogfood release, feedback, and promotion gates.
+11. Internal test release, feedback, and promotion gates.
 12. Cross-platform hardening.
 
 Each story should own its production-path acceptance evidence. Shared unit

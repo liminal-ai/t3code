@@ -8,17 +8,23 @@ import * as Scope from "effect/Scope";
 
 import * as Electron from "electron";
 
+import { CCODE_LONG_DESKTOP_IDENTITY } from "@t3tools/shared/desktopProductIdentity";
+
 export const DESKTOP_HOST = "app";
 export const DESKTOP_PRODUCTION_SCHEME = "t3code";
 export const DESKTOP_DEVELOPMENT_SCHEME = "t3code-dev";
 export const DESKTOP_NIGHTLY_SCHEME = "t3code-nightly";
 
-export function getDesktopScheme(isDevelopment: boolean, isNightly = false): string {
-  return isDevelopment
-    ? DESKTOP_DEVELOPMENT_SCHEME
-    : isNightly
-      ? DESKTOP_NIGHTLY_SCHEME
-      : DESKTOP_PRODUCTION_SCHEME;
+export const DESKTOP_CCODE_LONG_SCHEME = CCODE_LONG_DESKTOP_IDENTITY.scheme;
+
+export function getDesktopScheme(
+  isDevelopment: boolean,
+  isNightly = false,
+  isCCodeLong = false,
+): string {
+  if (isDevelopment) return DESKTOP_DEVELOPMENT_SCHEME;
+  if (isCCodeLong) return DESKTOP_CCODE_LONG_SCHEME;
+  return isNightly ? DESKTOP_NIGHTLY_SCHEME : DESKTOP_PRODUCTION_SCHEME;
 }
 
 export function getDesktopOrigin(isDevelopment: boolean): string {
@@ -135,6 +141,15 @@ export function registerDesktopSchemePrivilegesSync(): void {
     },
     {
       scheme: DESKTOP_NIGHTLY_SCHEME,
+      privileges: {
+        standard: true,
+        secure: true,
+        supportFetchAPI: true,
+        corsEnabled: true,
+      },
+    },
+    {
+      scheme: DESKTOP_CCODE_LONG_SCHEME,
       privileges: {
         standard: true,
         secure: true,

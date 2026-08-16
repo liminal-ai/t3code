@@ -1,7 +1,12 @@
 import { expect, it } from "@effect/vitest";
 import { describe } from "vite-plus/test";
 
-import { assetResponseHeaders, isLoopbackHostname, resolveDevRedirectUrl } from "./http.ts";
+import {
+  assetResponseHeaders,
+  DESKTOP_RENDERER_ORIGINS,
+  isLoopbackHostname,
+  resolveDevRedirectUrl,
+} from "./http.ts";
 
 describe("http dev routing", () => {
   it("treats localhost and loopback addresses as local", () => {
@@ -24,6 +29,17 @@ describe("http dev routing", () => {
     expect(resolveDevRedirectUrl(devUrl, requestUrl)).toBe(
       "http://127.0.0.1:5173/pair?token=test-token",
     );
+  });
+});
+
+describe("desktop renderer origins", () => {
+  it("allows every desktop renderer scheme, including CCode Long", () => {
+    expect(DESKTOP_RENDERER_ORIGINS).toEqual([
+      "t3code://app",
+      "t3code-dev://app",
+      "t3code-nightly://app",
+      "ccode-long://app",
+    ]);
   });
 });
 

@@ -14,8 +14,9 @@ import * as Path from "effect/Path";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopConfig from "./DesktopConfig.ts";
 import { resolveDesktopBaseDir, resolveDesktopStateDir } from "./DesktopStatePaths.ts";
-import { isNightlyDesktopVersion } from "../updates/updateChannels.ts";
+import { isCCodeLongDesktopVersion, isNightlyDesktopVersion } from "../updates/updateChannels.ts";
 import { getDesktopScheme } from "../electron/ElectronProtocol.ts";
+import { CCODE_LONG_DESKTOP_IDENTITY } from "@t3tools/shared/desktopProductIdentity";
 
 export interface MakeDesktopEnvironmentInput {
   readonly dirname: string;
@@ -80,7 +81,12 @@ export class DesktopEnvironment extends Context.Service<
     readonly linuxApplicationsDir: string;
     readonly appImagePath: Option.Option<string>;
     readonly userDataDirName: string;
-    readonly legacyUserDataDirName: string;
+    /**
+     * Pre-rename userData directory to keep using when it exists. None for
+     * products with no legacy install to inherit — CCode Long never adopts a
+     * T3 Code userData directory.
+     */
+    readonly legacyUserDataDirName: Option.Option<string>;
     readonly defaultDesktopSettings: DesktopAppSettings.DesktopSettings;
     readonly runtimeInfo: DesktopRuntimeInfo;
     readonly resolvePickFolderDefaultPath: (rawOptions: unknown) => Option.Option<string>;
@@ -105,6 +111,15 @@ function resolveDesktopAppBranding(input: {
   readonly isDevelopment: boolean;
   readonly appVersion: string;
 }): DesktopAppBranding {
+  if (!input.isDevelopment && isCCodeLongDesktopVersion(input.appVersion)) {
+    // The display name is the bare product name; the stage label only feeds
+    // secondary UI (backdrops, badges), never the window/app title.
+    return {
+      baseName: CCODE_LONG_DESKTOP_IDENTITY.productName,
+      stageLabel: "Test",
+      displayName: CCODE_LONG_DESKTOP_IDENTITY.productName,
+    };
+  }
   const stageLabel = resolveDesktopAppStageLabel(input);
   return {
     baseName: APP_BASE_NAME,
@@ -151,7 +166,11 @@ const make = Effect.fn("desktop.environment.make")(function* (
   const homeDirectory = input.homeDirectory;
   const devServerUrl = config.devServerUrl;
   const isDevelopment = Option.isSome(devServerUrl);
-  const isNightly = !isDevelopment && isNightlyDesktopVersion(input.appVersion);
+  const isCCodeLong = !isDevelopment && isCCodeLongDesktopVersion(input.appVersion);
+  const isNightly = !isDevelopment && !isCCodeLong && isNightlyDesktopVersion(input.appVersion);
+  // CCode Long honours only its own home override; T3CODE_HOME belongs to
+  // T3 Code and must never redirect this product onto T3 state.
+  const configuredHome = isCCodeLong ? config.ccodeLongHome : config.t3Home;
   const appDataDirectory =
     input.platform === "win32"
       ? Option.getOrElse(config.appDataDirectory, () =>
@@ -163,10 +182,11 @@ const make = Effect.fn("desktop.environment.make")(function* (
   const resolvedBaseDir = resolveDesktopBaseDir({
     homeDirectory,
     joinPath: path.join,
-    t3Home: config.t3Home,
+    t3Home: configuredHome,
+    ...(isCCodeLong ? { homeDirName: CCODE_LONG_DESKTOP_IDENTITY.homeDirName } : {}),
   });
   const baseDir =
-    isNightly && Option.isNone(config.t3Home)
+    isNightly && Option.isNone(configuredHome)
       ? path.join(resolvedBaseDir, "nightly")
       : resolvedBaseDir;
   const rootDir = path.resolve(input.dirname, "../../..");
@@ -184,14 +204,20 @@ const make = Effect.fn("desktop.environment.make")(function* (
     baseDir,
     isDevelopment,
     joinPath: path.join,
-    t3Home: config.t3Home,
+    t3Home: configuredHome,
   });
-  const userDataDirName = isDevelopment ? "t3code-dev" : isNightly ? "t3code-nightly" : "t3code";
-  const legacyUserDataDirName = isDevelopment
-    ? "T3 Code (Dev)"
-    : isNightly
-      ? "T3 Code (Nightly)"
-      : "T3 Code (Alpha)";
+  const userDataDirName = isCCodeLong
+    ? CCODE_LONG_DESKTOP_IDENTITY.userDataDirName
+    : isDevelopment
+      ? "t3code-dev"
+      : isNightly
+        ? "t3code-nightly"
+        : "t3code";
+  const legacyUserDataDirName: Option.Option<string> = isCCodeLong
+    ? Option.none()
+    : Option.some(
+        isDevelopment ? "T3 Code (Dev)" : isNightly ? "T3 Code (Nightly)" : "T3 Code (Alpha)",
+      );
   const linuxApplicationsDir = path.join(
     Option.getOrElse(config.xdgDataHome, () => path.join(homeDirectory, ".local", "share")),
     "applications",
@@ -236,22 +262,34 @@ const make = Effect.fn("desktop.environment.make")(function* (
     branding,
     displayName,
     appUserModelId: Option.getOrElse(config.appUserModelIdOverride, () =>
-      isDevelopment
-        ? "com.t3tools.t3code.dev"
-        : isNightly
-          ? "com.t3tools.t3code.nightly"
-          : "com.t3tools.t3code",
+      isCCodeLong
+        ? CCODE_LONG_DESKTOP_IDENTITY.appId
+        : isDevelopment
+          ? "com.t3tools.t3code.dev"
+          : isNightly
+            ? "com.t3tools.t3code.nightly"
+            : "com.t3tools.t3code",
     ),
-    linuxDesktopEntryName: isDevelopment
-      ? "t3code-dev.desktop"
+    linuxDesktopEntryName: isCCodeLong
+      ? `${CCODE_LONG_DESKTOP_IDENTITY.executableName}.desktop`
+      : isDevelopment
+        ? "t3code-dev.desktop"
+        : isNightly
+          ? "t3code-nightly.desktop"
+          : "t3code.desktop",
+    linuxWmClass: isCCodeLong
+      ? CCODE_LONG_DESKTOP_IDENTITY.executableName
+      : isDevelopment
+        ? "t3code-dev"
+        : isNightly
+          ? "t3code-nightly"
+          : "t3code",
+    desktopScheme: getDesktopScheme(isDevelopment, isNightly, isCCodeLong),
+    linuxUrlHandlerDesktopEntryName: isCCodeLong
+      ? `${CCODE_LONG_DESKTOP_IDENTITY.executableName}-url-handler.desktop`
       : isNightly
-        ? "t3code-nightly.desktop"
-        : "t3code.desktop",
-    linuxWmClass: isDevelopment ? "t3code-dev" : isNightly ? "t3code-nightly" : "t3code",
-    desktopScheme: getDesktopScheme(isDevelopment, isNightly),
-    linuxUrlHandlerDesktopEntryName: isNightly
-      ? "t3code-nightly-url-handler.desktop"
-      : "t3code-url-handler.desktop",
+        ? "t3code-nightly-url-handler.desktop"
+        : "t3code-url-handler.desktop",
     linuxApplicationsDir,
     appImagePath: config.appImagePath,
     userDataDirName,

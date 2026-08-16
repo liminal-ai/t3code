@@ -199,6 +199,10 @@
       "types": "./src/hostProcess.ts",
       "import": "./src/hostProcess.ts"
     },
+    "./desktopProductIdentity": {
+      "types": "./src/desktopProductIdentity.ts",
+      "import": "./src/desktopProductIdentity.ts"
+    },
     "./httpReadiness": {
       "types": "./src/httpReadiness.ts",
       "import": "./src/httpReadiness.ts"

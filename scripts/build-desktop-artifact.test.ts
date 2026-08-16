@@ -1,4 +1,5 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import { CCODE_LONG_DESKTOP_IDENTITY } from "@t3tools/shared/desktopProductIdentity";
 import { assert, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as FileSystem from "effect/FileSystem";
@@ -28,16 +29,25 @@ import {
   LinuxIconResizeError,
   MacPasskeySigningConfigurationResolutionError,
   MissingMacPasskeyProvisioningProfileError,
+  hasMacPasskeySigningConfiguration,
   packWindowsServerAsar,
   renderMacPasskeyEntitlements,
   resolveClerkPasskeyNativeArtifacts,
   resolveMacPasskeySigningConfiguration,
+  resolveOptionalMacPasskeySigningConfiguration,
   resolveDesktopRuntimeDependencies,
   resolveFffNativeDependencies,
   resolveBuildOptions,
   resolveDesktopBuildIconAssets,
   resolveDesktopProductName,
   resolveDesktopUpdateChannel,
+  resolveDesktopAppId,
+  resolveDesktopArtifactNameTemplate,
+  resolveDesktopArtworkChannel,
+  resolveDesktopExecutableName,
+  resolveDesktopProtocols,
+  ConflictingMacSigningModesError,
+  AdhocSignUnsupportedPlatformError,
   resolveDesktopWebAssetBrand,
   resolveResourceMonitorRustTargets,
   resourceMonitorExecutableName,
@@ -961,6 +971,65 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.notInclude(invalidPublishableKeyError.message, "pk_test_%");
   });
 
+  it("treats passkey signing as optional for plain Developer ID builds", () => {
+    // Publishable key alone is ordinary public config, not passkey config.
+    const env = { T3CODE_CLERK_PUBLISHABLE_KEY: `pk_test_${btoa("example.clerk.accounts.dev$")}` };
+    assert.isFalse(hasMacPasskeySigningConfiguration({}));
+    assert.isFalse(hasMacPasskeySigningConfiguration(env));
+    assert.isFalse(hasMacPasskeySigningConfiguration({ T3CODE_APPLE_TEAM_ID: "   " }));
+    assert.isUndefined(resolveOptionalMacPasskeySigningConfiguration({}));
+    assert.isUndefined(resolveOptionalMacPasskeySigningConfiguration(env));
+  });
+
+  it("rejects partial passkey signing configuration instead of ignoring it", () => {
+    assert.isTrue(hasMacPasskeySigningConfiguration({ T3CODE_APPLE_TEAM_ID: "ABC1234567" }));
+    assert.isTrue(
+      hasMacPasskeySigningConfiguration({
+        T3CODE_MACOS_PROVISIONING_PROFILE: "/tmp/t3code.provisionprofile",
+      }),
+    );
+    assert.isTrue(
+      hasMacPasskeySigningConfiguration({
+        T3CODE_CLERK_PASSKEY_RP_DOMAINS: "example.clerk.accounts.dev",
+      }),
+    );
+
+    // Team ID alone: profile is missing.
+    assert.throws(
+      () => resolveOptionalMacPasskeySigningConfiguration({ T3CODE_APPLE_TEAM_ID: "ABC1234567" }),
+      MissingMacPasskeyProvisioningProfileError,
+    );
+    // Profile alone: team id is missing/invalid.
+    assert.throws(
+      () =>
+        resolveOptionalMacPasskeySigningConfiguration({
+          T3CODE_MACOS_PROVISIONING_PROFILE: "/tmp/t3code.provisionprofile",
+        }),
+      /must be a 10-character Apple Developer Team ID/u,
+    );
+    // Team id + profile but no domain source.
+    assert.throws(
+      () =>
+        resolveOptionalMacPasskeySigningConfiguration({
+          T3CODE_APPLE_TEAM_ID: "ABC1234567",
+          T3CODE_MACOS_PROVISIONING_PROFILE: "/tmp/t3code.provisionprofile",
+        }),
+      /T3CODE_CLERK_PUBLISHABLE_KEY or T3CODE_CLERK_PASSKEY_RP_DOMAINS is required/u,
+    );
+  });
+
+  it("resolves the full passkey configuration through the optional path unchanged", () => {
+    const env = {
+      T3CODE_APPLE_TEAM_ID: "abc1234567",
+      T3CODE_MACOS_PROVISIONING_PROFILE: "/tmp/t3code.provisionprofile",
+      T3CODE_CLERK_PASSKEY_RP_DOMAINS: "example.clerk.accounts.dev",
+    };
+    assert.deepStrictEqual(
+      resolveOptionalMacPasskeySigningConfiguration(env),
+      resolveMacPasskeySigningConfiguration(env),
+    );
+  });
+
   it("preserves known passkey signing configuration errors at the build boundary", () => {
     const decodingCause = new Error("publishable-key-decode-failed");
     const knownError = new InvalidMacPasskeyPublishableKeyError({ cause: decodingCause });
@@ -998,6 +1067,200 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         { name: "T3 Code", schemes: ["t3code", "t3code-dev"] },
       ]);
     }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
+  );
+
+  it.effect("forces code signing on signed macOS builds and not otherwise", () =>
+    Effect.gen(function* () {
+      const signedPlain = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "1.2.3-nightly.20260816.4",
+        true,
+        false,
+        undefined,
+        undefined,
+      );
+      const signedPasskey = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "1.2.3",
+        true,
+        false,
+        undefined,
+        {
+          entitlementsPath: "/tmp/entitlements.mac.plist",
+          provisioningProfilePath: "/tmp/t3code.provisionprofile",
+        },
+      );
+      const unsigned = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "1.2.3-nightly.20260816.4",
+        false,
+        false,
+        undefined,
+        undefined,
+      );
+
+      assert.strictEqual(signedPlain.forceCodeSigning, true);
+      const plainMac = signedPlain.mac as Record<string, unknown>;
+      assert.notProperty(plainMac, "entitlements");
+      assert.notProperty(plainMac, "provisioningProfile");
+      assert.strictEqual(signedPasskey.forceCodeSigning, true);
+      assert.notProperty(unsigned, "forceCodeSigning");
+    }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
+  );
+
+  it.effect("gives CCode Long builds their own build identity from the shared source", () =>
+    Effect.gen(function* () {
+      const version = "0.0.0-ccode-long.20260816.5";
+      const config = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        version,
+        false,
+        false,
+        undefined,
+        undefined,
+      );
+
+      assert.equal(config.appId, CCODE_LONG_DESKTOP_IDENTITY.appId);
+      assert.equal(config.appId, "ai.liminal.ccodelong");
+      assert.equal(config.productName, "CCode Long");
+      assert.equal(config.artifactName, "CCode-Long-${version}-${arch}.${ext}");
+      assert.equal(resolveDesktopExecutableName(version), "ccode-long");
+      assert.deepStrictEqual(resolveDesktopProtocols(version), ["ccode-long"]);
+      assert.deepStrictEqual((config.mac as Record<string, unknown>).protocols, [
+        { name: "CCode Long", schemes: ["ccode-long"] },
+      ]);
+      assert.equal(resolveDesktopUpdateChannel(version), "ccode-long");
+      // Neutral artwork until the product has its own.
+      assert.equal(resolveDesktopArtworkChannel(version), "latest");
+      assert.equal(
+        (config.dmg as Record<string, unknown>).background,
+        "dmg/dmg-background-latest.png",
+      );
+      assert.equal(
+        (config.dmg as Record<string, unknown>).title,
+        `CCode Long ${version} Installer`,
+      );
+      // Nothing product-owned carries T3 or nightly identity.
+      for (const value of [
+        String(config.appId),
+        String(config.productName),
+        String(config.artifactName),
+        resolveDesktopExecutableName(version),
+        ...resolveDesktopProtocols(version),
+        resolveDesktopUpdateChannel(version),
+      ]) {
+        assert.notInclude(value.toLowerCase(), "t3");
+        assert.notInclude(value.toLowerCase(), "nightly");
+      }
+    }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
+  );
+
+  it.effect("publishes CCode Long as a prerelease on its own updater channel", () =>
+    Effect.gen(function* () {
+      const publish = yield* resolveGitHubPublishConfig("ccode-long");
+      assert.deepStrictEqual(publish, {
+        provider: "github",
+        owner: "liminal-ai",
+        repo: "t3code",
+        releaseType: "prerelease",
+        channel: "ccode-long",
+      });
+      const nightly = yield* resolveGitHubPublishConfig("nightly");
+      assert.equal(nightly?.channel, "nightly");
+      const latest = yield* resolveGitHubPublishConfig("latest");
+      assert.equal(latest?.releaseType, "release");
+      assert.notProperty(latest ?? {}, "channel");
+    }).pipe(
+      Effect.provide(
+        ConfigProvider.layer(
+          ConfigProvider.fromEnv({ env: { GITHUB_REPOSITORY: "liminal-ai/t3code" } }),
+        ),
+      ),
+    ),
+  );
+
+  it("keeps upstream T3 build identity unchanged", () => {
+    assert.equal(resolveDesktopAppId("1.2.3"), "com.t3tools.t3code");
+    assert.equal(resolveDesktopAppId("1.2.3-nightly.20260816.1"), "com.t3tools.t3code.nightly");
+    assert.equal(resolveDesktopProductName("1.2.3-nightly.20260816.1"), "T3 Code (Nightly)");
+    assert.deepStrictEqual(resolveDesktopProtocols("1.2.3"), ["t3code", "t3code-dev"]);
+    assert.equal(resolveDesktopArtifactNameTemplate("1.2.3"), "T3-Code-${version}-${arch}.${ext}");
+    assert.equal(
+      resolveDesktopArtifactNameTemplate("1.2.3-nightly.20260816.1"),
+      "T3-Code-Nightly-${version}-${arch}.${ext}",
+    );
+  });
+
+  it.effect("configures an ad-hoc macOS seal that can never claim Developer ID", () =>
+    Effect.gen(function* () {
+      const config = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "0.0.0-ccode-long.20260816.5",
+        false,
+        false,
+        undefined,
+        undefined,
+        true,
+      );
+      const mac = config.mac as Record<string, unknown>;
+      assert.equal(mac.identity, "-");
+      assert.strictEqual(mac.notarize, false);
+      assert.strictEqual(config.forceCodeSigning, true);
+      assert.notProperty(mac, "entitlements");
+      assert.notProperty(mac, "provisioningProfile");
+    }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
+  );
+
+  it.effect("rejects combining Developer ID signing with ad-hoc signing", () =>
+    Effect.gen(function* () {
+      const error = yield* resolveBuildOptions({
+        platform: Option.some("mac"),
+        target: Option.none(),
+        arch: Option.some("arm64"),
+        buildVersion: Option.none(),
+        outputDir: Option.none(),
+        skipBuild: Option.none(),
+        keepStage: Option.none(),
+        signed: Option.some(true),
+        adhocSign: Option.some(true),
+        verbose: Option.none(),
+        mockUpdates: Option.none(),
+        mockUpdateServerPort: Option.none(),
+        wslPrebuild: Option.none(),
+      }).pipe(Effect.flip);
+      assert.instanceOf(error, ConflictingMacSigningModesError);
+
+      const linuxError = yield* resolveBuildOptions({
+        platform: Option.some("linux"),
+        target: Option.none(),
+        arch: Option.some("x64"),
+        buildVersion: Option.none(),
+        outputDir: Option.none(),
+        skipBuild: Option.none(),
+        keepStage: Option.none(),
+        signed: Option.none(),
+        adhocSign: Option.some(true),
+        verbose: Option.none(),
+        mockUpdates: Option.none(),
+        mockUpdateServerPort: Option.none(),
+        wslPrebuild: Option.none(),
+      }).pipe(Effect.flip);
+      assert.instanceOf(linuxError, AdhocSignUnsupportedPlatformError);
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          NodeServices.layer,
+          Layer.succeed(HostProcessPlatform, "darwin"),
+          Layer.succeed(HostProcessArchitecture, "arm64"),
+          ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })),
+        ),
+      ),
+    ),
   );
 
   it.effect("uses the nightly DMG background for nightly macOS builds", () =>
@@ -1201,6 +1464,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         skipBuild: Option.none(),
         keepStage: Option.none(),
         signed: Option.none(),
+        adhocSign: Option.none(),
         verbose: Option.none(),
         mockUpdates: Option.none(),
         mockUpdateServerPort: Option.none(),
@@ -1241,6 +1505,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
             skipBuild: Option.none(),
             keepStage: Option.none(),
             signed: Option.none(),
+            adhocSign: Option.none(),
             verbose: Option.none(),
             mockUpdates: Option.none(),
             mockUpdateServerPort: Option.none(),
@@ -1265,6 +1530,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         skipBuild: Option.some(false),
         keepStage: Option.some(false),
         signed: Option.some(false),
+        adhocSign: Option.some(false),
         verbose: Option.some(false),
         mockUpdates: Option.some(false),
         mockUpdateServerPort: Option.none(),

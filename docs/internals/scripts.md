@@ -91,9 +91,20 @@ authenticated.
   launch.
 - To keep staging files for debugging package contents, run: `vp run dist:desktop:dmg --keep-stage`
 - To allow code-signing/notarization when configured in CI/secrets, add: `--signed`.
-- Signed macOS builds also require `T3CODE_APPLE_TEAM_ID` and
-  `T3CODE_MACOS_PROVISIONING_PROFILE`. The passkey RP domain is derived from
-  `T3CODE_CLERK_PUBLISHABLE_KEY` unless `T3CODE_CLERK_PASSKEY_RP_DOMAINS` overrides it.
+- Signed macOS builds fail closed (`forceCodeSigning`) when no signing identity is found; a
+  `--signed` build never silently produces an unsigned bundle.
+- `--adhoc-sign` (macOS only, env `T3CODE_DESKTOP_ADHOC_SIGN`) applies an ad-hoc code seal
+  (`identity: "-"`, `notarize: false`, `forceCodeSigning`) for personal test builds. It is mutually
+  exclusive with `--signed` and never produces a Developer ID or notarized artifact.
+- A `-ccode-long.YYYYMMDD.N` build version selects the CCode Long product identity (name, bundle
+  id, scheme, artifact prefix, updater channel) from `packages/shared/src/desktopProductIdentity.ts`
+  via `scripts/lib/desktop-identity.ts`; other versions keep upstream T3 Code identity.
+- Passkey (Associated Domains) entitlements are optional. When any of `T3CODE_APPLE_TEAM_ID`,
+  `T3CODE_MACOS_PROVISIONING_PROFILE`, or `T3CODE_CLERK_PASSKEY_RP_DOMAINS` is set, all of the
+  passkey configuration is required: Team ID, provisioning profile, and an RP domain derived from
+  `T3CODE_CLERK_PUBLISHABLE_KEY` unless `T3CODE_CLERK_PASSKEY_RP_DOMAINS` overrides it. When none of
+  them is set, `--signed` uses electron-builder's default hardened-runtime entitlements and no
+  provisioning profile.
 - Windows `--signed` uses Azure Trusted Signing and expects:
   `AZURE_TRUSTED_SIGNING_ENDPOINT`, `AZURE_TRUSTED_SIGNING_ACCOUNT_NAME`,
   `AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE_NAME`, and `AZURE_TRUSTED_SIGNING_PUBLISHER_NAME`.

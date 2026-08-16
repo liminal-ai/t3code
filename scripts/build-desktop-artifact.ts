@@ -28,6 +28,27 @@ import {
 } from "./lib/brand-assets.ts";
 import { getDefaultBuildArch } from "./lib/build-target-arch.ts";
 import {
+  type DesktopBuildUpdateChannel,
+  resolveDesktopAppId,
+  resolveDesktopArtifactNameTemplate,
+  resolveDesktopArtworkChannel,
+  resolveDesktopExecutableName,
+  resolveDesktopProductName,
+  resolveDesktopProtocols,
+  resolveDesktopUpdateChannel,
+} from "./lib/desktop-identity.ts";
+
+export {
+  type DesktopBuildUpdateChannel,
+  resolveDesktopAppId,
+  resolveDesktopArtifactNameTemplate,
+  resolveDesktopArtworkChannel,
+  resolveDesktopExecutableName,
+  resolveDesktopProductName,
+  resolveDesktopProtocols,
+  resolveDesktopUpdateChannel,
+};
+import {
   findInlinedExternalPackages,
   selectCliRuntimeExternalDependencies,
 } from "./lib/cli-external-packages.ts";
@@ -158,6 +179,7 @@ interface BuildCliInput {
   readonly skipBuild: Option.Option<boolean>;
   readonly keepStage: Option.Option<boolean>;
   readonly signed: Option.Option<boolean>;
+  readonly adhocSign: Option.Option<boolean>;
   readonly verbose: Option.Option<boolean>;
   readonly mockUpdates: Option.Option<boolean>;
   readonly mockUpdateServerPort: Option.Option<number>;
@@ -212,6 +234,26 @@ export class ClerkPasskeyNativePackageMissingError extends Schema.TaggedErrorCla
 ) {
   override get message(): string {
     return `Clerk passkey native package is missing: ${this.packageName}`;
+  }
+}
+
+export class ConflictingMacSigningModesError extends Schema.TaggedErrorClass<ConflictingMacSigningModesError>()(
+  "ConflictingMacSigningModesError",
+  {},
+) {
+  override get message(): string {
+    return "--signed (Developer ID) and --adhoc-sign are mutually exclusive.";
+  }
+}
+
+export class AdhocSignUnsupportedPlatformError extends Schema.TaggedErrorClass<AdhocSignUnsupportedPlatformError>()(
+  "AdhocSignUnsupportedPlatformError",
+  {
+    platform: Schema.String,
+  },
+) {
+  override get message(): string {
+    return `--adhoc-sign is a macOS-only mode; platform '${this.platform}' does not support it.`;
   }
 }
 
@@ -760,6 +802,12 @@ interface ResolvedBuildOptions {
   readonly skipBuild: boolean;
   readonly keepStage: boolean;
   readonly signed: boolean;
+  /**
+   * macOS ad-hoc code seal (`codesign -s -`): a valid seal with no Developer
+   * ID, no notarization, and no Gatekeeper acceptance. Personal-test builds
+   * only. Mutually exclusive with `signed`.
+   */
+  readonly adhocSign: boolean;
   readonly verbose: boolean;
   readonly mockUpdates: boolean;
   readonly mockUpdateServerPort: number | undefined;
@@ -971,6 +1019,39 @@ function normalizePasskeyRpDomain(value: string): string {
   }
 
   return parsed.hostname;
+}
+
+/**
+ * Environment keys that only exist for the macOS passkey (Associated Domains)
+ * signing path. `T3CODE_CLERK_PUBLISHABLE_KEY` is deliberately not on this
+ * list: it is ordinary public config present on every production build and
+ * must not switch a plain Developer ID build into passkey mode.
+ */
+export const MAC_PASSKEY_SIGNING_ENV_KEYS = [
+  "T3CODE_APPLE_TEAM_ID",
+  "T3CODE_MACOS_PROVISIONING_PROFILE",
+  "T3CODE_CLERK_PASSKEY_RP_DOMAINS",
+] as const;
+
+export function hasMacPasskeySigningConfiguration(
+  env: Readonly<Record<string, string | undefined>>,
+): boolean {
+  return MAC_PASSKEY_SIGNING_ENV_KEYS.some((key) => (env[key]?.trim().length ?? 0) > 0);
+}
+
+/**
+ * Passkey signing is optional for signed macOS builds. With none of the
+ * passkey keys set, a Developer ID build proceeds with electron-builder's
+ * default hardened-runtime entitlements and no provisioning profile. With any
+ * of them set, the full configuration is required — a partial passkey setup
+ * is a mistake, never silently downgraded to a plain signed build.
+ */
+export function resolveOptionalMacPasskeySigningConfiguration(
+  env: Readonly<Record<string, string | undefined>>,
+): MacPasskeySigningConfiguration | undefined {
+  return hasMacPasskeySigningConfiguration(env)
+    ? resolveMacPasskeySigningConfiguration(env)
+    : undefined;
 }
 
 export function resolveMacPasskeySigningConfiguration(
@@ -1231,6 +1312,7 @@ const BuildEnvConfig = Config.all({
   skipBuild: Config.boolean("T3CODE_DESKTOP_SKIP_BUILD").pipe(Config.withDefault(false)),
   keepStage: Config.boolean("T3CODE_DESKTOP_KEEP_STAGE").pipe(Config.withDefault(false)),
   signed: Config.boolean("T3CODE_DESKTOP_SIGNED").pipe(Config.withDefault(false)),
+  adhocSign: Config.boolean("T3CODE_DESKTOP_ADHOC_SIGN").pipe(Config.withDefault(false)),
   verbose: Config.boolean("T3CODE_DESKTOP_VERBOSE").pipe(Config.withDefault(false)),
   mockUpdates: Config.boolean("T3CODE_DESKTOP_MOCK_UPDATES").pipe(Config.withDefault(false)),
   mockUpdateServerPort: Config.string("T3CODE_DESKTOP_MOCK_UPDATE_SERVER_PORT").pipe(Config.option),
@@ -1316,6 +1398,13 @@ export const resolveBuildOptions = Effect.fn("resolveBuildOptions")(function* (
   const skipBuild = resolveBooleanFlag(input.skipBuild, env.skipBuild);
   const keepStage = resolveBooleanFlag(input.keepStage, env.keepStage);
   const signed = resolveBooleanFlag(input.signed, env.signed);
+  const adhocSign = resolveBooleanFlag(input.adhocSign, env.adhocSign);
+  if (signed && adhocSign) {
+    return yield* new ConflictingMacSigningModesError();
+  }
+  if (adhocSign && platform !== "mac") {
+    return yield* new AdhocSignUnsupportedPlatformError({ platform });
+  }
   const verbose = resolveBooleanFlag(input.verbose, env.verbose);
 
   const mockUpdates = resolveBooleanFlag(input.mockUpdates, env.mockUpdates);
@@ -1342,6 +1431,7 @@ export const resolveBuildOptions = Effect.fn("resolveBuildOptions")(function* (
     skipBuild,
     keepStage,
     signed,
+    adhocSign,
     verbose,
     mockUpdates,
     mockUpdateServerPort,
@@ -1947,7 +2037,7 @@ export function resolveDesktopRuntimeDependencies(
 }
 
 export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig")(function* (
-  updateChannel: "latest" | "nightly",
+  updateChannel: DesktopBuildUpdateChannel,
 ) {
   const env = yield* Config.all({
     updateRepository: Config.string("T3CODE_DESKTOP_UPDATE_REPOSITORY").pipe(Config.option),
@@ -1967,21 +2057,17 @@ export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig"
     provider: "github",
     owner,
     repo,
-    releaseType: updateChannel === "nightly" ? "prerelease" : "release",
-    ...(updateChannel === "nightly" ? { channel: "nightly" as const } : {}),
+    releaseType: updateChannel === "latest" ? "release" : "prerelease",
+    ...(updateChannel === "latest" ? {} : { channel: updateChannel }),
   };
 });
 
-export function resolveDesktopUpdateChannel(version: string): "latest" | "nightly" {
-  return /-nightly\.\d{8}\.\d+$/.test(version) ? "nightly" : "latest";
-}
-
 export function resolveDesktopWebAssetBrand(version: string): WebAssetBrand {
-  return resolveWebAssetBrandForChannel(resolveDesktopUpdateChannel(version));
+  return resolveWebAssetBrandForChannel(resolveDesktopArtworkChannel(version));
 }
 
 export function resolveDesktopBuildIconAssets(version: string): DesktopBuildIconAssets {
-  if (resolveDesktopUpdateChannel(version) === "nightly") {
+  if (resolveDesktopArtworkChannel(version) === "nightly") {
     return {
       macIconPng: BRAND_ASSET_PATHS.nightlyMacIconPng,
       linuxIconPng: BRAND_ASSET_PATHS.nightlyLinuxIconPng,
@@ -2013,28 +2099,6 @@ export function resolvePackageManagerUserAgent(packageManager: string): string {
   return `${trimmed.slice(0, versionSeparator)}/${trimmed.slice(versionSeparator + 1)}`;
 }
 
-export function resolveDesktopProductName(version: string): string {
-  return resolveDesktopUpdateChannel(version) === "nightly"
-    ? "T3 Code (Nightly)"
-    : (desktopPackageJson.productName ?? "T3 Code");
-}
-
-export function resolveDesktopAppId(version: string): string {
-  return resolveDesktopUpdateChannel(version) === "nightly"
-    ? `${DESKTOP_APP_ID}.nightly`
-    : DESKTOP_APP_ID;
-}
-
-export function resolveDesktopExecutableName(version: string): string {
-  return resolveDesktopUpdateChannel(version) === "nightly" ? "t3code-nightly" : "t3code";
-}
-
-export function resolveDesktopProtocols(version: string): readonly string[] {
-  return resolveDesktopUpdateChannel(version) === "nightly"
-    ? ["t3code-nightly"]
-    : ["t3code", "t3code-dev"];
-}
-
 export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   platform: typeof BuildPlatform.Type,
   target: string,
@@ -2048,18 +2112,17 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
         readonly provisioningProfilePath: string;
       }
     | undefined,
+  adhocSign = false,
 ) {
   const updateChannel = resolveDesktopUpdateChannel(version);
-  const isNightly = updateChannel === "nightly";
+  const artworkChannel = resolveDesktopArtworkChannel(version);
   const executableName = resolveDesktopExecutableName(version);
   const protocols = resolveDesktopProtocols(version);
-  const protocolName = isNightly ? resolveDesktopProductName(version) : "T3 Code";
+  const protocolName = updateChannel === "latest" ? "T3 Code" : resolveDesktopProductName(version);
   const buildConfig: Record<string, unknown> = {
     appId: resolveDesktopAppId(version),
     productName: resolveDesktopProductName(version),
-    artifactName: isNightly
-      ? "T3-Code-Nightly-${version}-${arch}.${ext}"
-      : "T3-Code-${version}-${arch}.${ext}",
+    artifactName: resolveDesktopArtifactNameTemplate(version),
     electronLanguages: [...DESKTOP_ELECTRON_LANGUAGES],
     files: [...DESKTOP_FILE_EXCLUSIONS],
     directories: {
@@ -2087,6 +2150,14 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   }
 
   if (platform === "mac") {
+    // A signed macOS build must never silently degrade to unsigned output:
+    // electron-builder skips signing when no identity is discovered, and the
+    // resulting bundle carries Electron's broken inherited seal, which
+    // Gatekeeper reports as "damaged". forceCodeSigning turns that into a
+    // build failure.
+    if (signed || adhocSign) {
+      buildConfig.forceCodeSigning = true;
+    }
     buildConfig.mac = {
       target: target === "dmg" ? [target, "zip"] : [target],
       icon: "icon.icns",
@@ -2103,6 +2174,11 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
             provisioningProfile: macPasskeySigning.provisioningProfilePath,
           }
         : {}),
+      // Ad-hoc seal: `codesign -s -` via electron-builder's "-" identity. It
+      // produces a valid seal (no "damaged" verdict) but never a Developer ID
+      // authority or notarization ticket; notarize is pinned off so stray
+      // Apple credentials in the environment cannot change the artifact class.
+      ...(adhocSign ? { identity: "-", notarize: false } : {}),
     };
   }
 
@@ -2112,7 +2188,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       // DMG window backgrounds by volume name, so reusing a generic name can
       // make a newly built background look unchanged during testing.
       title: `${resolveDesktopProductName(version)} ${version} Installer`,
-      background: `dmg/dmg-background-${updateChannel}.png`,
+      background: `dmg/dmg-background-${artworkChannel}.png`,
       window: {
         width: 540,
         // Finder counts its 32px title bar in the window bounds. The themed
@@ -2831,7 +2907,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   if (options.platform === "mac" && options.target === "dmg") {
     yield* stageDesktopDmgBackground(
       stageResourcesDir,
-      resolveDesktopUpdateChannel(appVersion),
+      resolveDesktopArtworkChannel(appVersion),
       options.verbose,
     );
   }
@@ -2863,10 +2939,13 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   const stageProdResourcesDir = path.join(stageAppDir, "apps/desktop/prod-resources");
   yield* fs.copy(stageResourcesDir, stageProdResourcesDir);
 
+  // Signed macOS builds only take the passkey entitlements/provisioning path
+  // when passkey configuration is present; a plain Developer ID build needs
+  // neither and must not be blocked on them.
   const configuredMacPasskeySigning =
     options.platform === "mac" && options.signed
       ? yield* Effect.try({
-          try: () => resolveMacPasskeySigningConfiguration(loadRepoEnv({ repoRoot })),
+          try: () => resolveOptionalMacPasskeySigningConfiguration(loadRepoEnv({ repoRoot })),
           catch: MacPasskeySigningConfigurationResolutionError.fromCause,
         })
       : undefined;
@@ -2940,6 +3019,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
             provisioningProfilePath: macPasskeySigning.provisioningProfilePath,
           }
         : undefined,
+      options.adhocSign,
     ),
     dependencies: stageDependencies,
     devDependencies: {
@@ -3157,6 +3237,12 @@ const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
   signed: Flag.boolean("signed").pipe(
     Flag.withDescription(
       "Enable signing/notarization discovery; Windows uses Azure Trusted Signing (env: T3CODE_DESKTOP_SIGNED).",
+    ),
+    Flag.optional,
+  ),
+  adhocSign: Flag.boolean("adhoc-sign").pipe(
+    Flag.withDescription(
+      "macOS only: apply an ad-hoc code seal (no Developer ID, no notarization). Mutually exclusive with --signed (env: T3CODE_DESKTOP_ADHOC_SIGN).",
     ),
     Flag.optional,
   ),

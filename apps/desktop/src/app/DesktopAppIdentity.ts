@@ -48,9 +48,18 @@ const normalizeCommitHash = (value: string): Option.Option<string> => {
 export const resolveUserDataPath = Effect.gen(function* () {
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
   const fileSystem = yield* FileSystem.FileSystem;
+  const currentPath = environment.path.join(
+    environment.appDataDirectory,
+    environment.userDataDirName,
+  );
+  // No legacy name means nothing to inherit: never probe (let alone adopt) a
+  // directory that belongs to another product.
+  if (Option.isNone(environment.legacyUserDataDirName)) {
+    return currentPath;
+  }
   const legacyPath = environment.path.join(
     environment.appDataDirectory,
-    environment.legacyUserDataDirName,
+    environment.legacyUserDataDirName.value,
   );
   const legacyPathExists = yield* fileSystem.exists(legacyPath).pipe(
     Effect.mapError(
@@ -61,9 +70,7 @@ export const resolveUserDataPath = Effect.gen(function* () {
         }),
     ),
   );
-  return legacyPathExists
-    ? legacyPath
-    : environment.path.join(environment.appDataDirectory, environment.userDataDirName);
+  return legacyPathExists ? legacyPath : currentPath;
 }).pipe(Effect.withSpan("desktop.appIdentity.resolveUserDataPath"));
 
 export const make = Effect.gen(function* () {
