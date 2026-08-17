@@ -45,6 +45,7 @@ import {
   resolveDesktopArtifactNameTemplate,
   resolveDesktopArtworkChannel,
   resolveDesktopExecutableName,
+  resolveDesktopPackageName,
   resolveDesktopProtocols,
   ConflictingMacSigningModesError,
   AdhocSignUnsupportedPlatformError,
@@ -1129,6 +1130,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       assert.equal(config.productName, "CCode Long");
       assert.equal(config.artifactName, "CCode-Long-${version}-${arch}.${ext}");
       assert.equal(resolveDesktopExecutableName(version), "ccode-long");
+      assert.equal(resolveDesktopPackageName(version), "ccode-long");
       assert.deepStrictEqual(resolveDesktopProtocols(version), ["ccode-long"]);
       assert.deepStrictEqual((config.mac as Record<string, unknown>).protocols, [
         { name: "CCode Long", schemes: ["ccode-long"] },
@@ -1185,6 +1187,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
 
   it("keeps upstream T3 build identity unchanged", () => {
     assert.equal(resolveDesktopAppId("1.2.3"), "com.t3tools.t3code");
+    assert.equal(resolveDesktopPackageName("1.2.3"), "t3code");
     assert.equal(resolveDesktopAppId("1.2.3-nightly.20260816.1"), "com.t3tools.t3code.nightly");
     assert.equal(resolveDesktopProductName("1.2.3-nightly.20260816.1"), "T3 Code (Nightly)");
     assert.deepStrictEqual(resolveDesktopProtocols("1.2.3"), ["t3code", "t3code-dev"]);

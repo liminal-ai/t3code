@@ -55,6 +55,15 @@ export function resolveDesktopExecutableName(version: string): string {
   return resolveDesktopUpdateChannel(version) === "nightly" ? "t3code-nightly" : "t3code";
 }
 
+/**
+ * The package name embedded in app.asar. Electron can use this value when it
+ * chooses the macOS Safe Storage keychain service, so it must not retain the
+ * upstream package identity in a CCode Long build.
+ */
+export function resolveDesktopPackageName(version: string): string {
+  return isCCodeLongDesktopVersion(version) ? CCODE_LONG_DESKTOP_IDENTITY.executableName : "t3code";
+}
+
 export function resolveDesktopProtocols(version: string): readonly string[] {
   if (isCCodeLongDesktopVersion(version)) return [CCODE_LONG_DESKTOP_IDENTITY.scheme];
   return resolveDesktopUpdateChannel(version) === "nightly"

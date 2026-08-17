@@ -212,6 +212,8 @@ jobs:
             local exe="$app/Contents/MacOS/$expected_name"
             [[ -x "$exe" ]] || { echo "$label: executable missing at $exe" >&2; exit 1; }
             lipo -archs "$exe" | grep -qw arm64 || { echo "$label: executable is not arm64: $(lipo -archs "$exe")" >&2; exit 1; }
+            (cd scripts && node verify-desktop-asar-identity.mjs \
+              "$app/Contents/Resources/app.asar" ccode-long "$expected_name")
             # Nothing declared may point at T3 Code Nightly.
             if grep -Eiq 't3tools|t3code|nightly' <<<"$bundle_id $name $display $exec_name $schemes"; then
               echo "$label: bundle identity references T3 Code / Nightly" >&2; exit 1

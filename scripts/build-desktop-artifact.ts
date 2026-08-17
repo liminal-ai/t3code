@@ -33,6 +33,7 @@ import {
   resolveDesktopArtifactNameTemplate,
   resolveDesktopArtworkChannel,
   resolveDesktopExecutableName,
+  resolveDesktopPackageName,
   resolveDesktopProductName,
   resolveDesktopProtocols,
   resolveDesktopUpdateChannel,
@@ -44,6 +45,7 @@ export {
   resolveDesktopArtifactNameTemplate,
   resolveDesktopArtworkChannel,
   resolveDesktopExecutableName,
+  resolveDesktopPackageName,
   resolveDesktopProductName,
   resolveDesktopProtocols,
   resolveDesktopUpdateChannel,
@@ -816,6 +818,7 @@ interface ResolvedBuildOptions {
 
 interface StagePackageJson {
   readonly name: string;
+  readonly productName: string;
   readonly version: string;
   readonly buildVersion: string;
   readonly t3codeCommitHash: string;
@@ -2997,7 +3000,8 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
       ? path.join(stageAppDir, WINDOWS_SERVER_RESOURCE_SOURCE_DIR, WINDOWS_SERVER_ASAR_RESOURCE)
       : undefined;
   const stagePackageJson: StagePackageJson = {
-    name: "t3code",
+    name: resolveDesktopPackageName(appVersion),
+    productName: resolveDesktopProductName(appVersion),
     version: appVersion,
     buildVersion: appVersion,
     t3codeCommitHash: commitHash,
